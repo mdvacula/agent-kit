@@ -32,22 +32,15 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         working-directory: agent-template
         run: |
-          SKILL=$(cat "${{ github.workspace }}/.agents/skills/agentic-setup/SKILL.md")
+          cat "${{ github.workspace }}/.agents/skills/agentic-setup/SKILL.md" | \
           pi --provider openrouter \
              --model anthropic/claude-sonnet-4-6 \
              --no-session \
-             -p "${SKILL}
-
-          ---
-
-          You are running in MODE B (template generation) of the skill above.
-
+             -p "The above is the agentic-setup skill. Execute MODE B exactly as specified.
           Source agent-kit is at: ${{ github.workspace }}
           Your working directory is the agent-template checkout.
           Triggering commit: ${{ github.sha }}
-
-          Execute MODE B exactly as specified. Leave PROJECT_NAME, TECH_STACK, and
-          all other placeholder variables unsubstituted as literal strings.
+          Leave PROJECT_NAME, TECH_STACK, and all other placeholder variables unsubstituted as literal strings.
           Do NOT run git commit — the PR step handles that."
 
       - name: Open PR on agent-template

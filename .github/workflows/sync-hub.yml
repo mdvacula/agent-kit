@@ -30,22 +30,16 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         working-directory: mcp-task-hub
         run: |
-          SKILL=$(cat "${{ github.workspace }}/.agents/skills/mcp-hub-setup/SKILL.md")
+          cat "${{ github.workspace }}/.agents/skills/mcp-hub-setup/SKILL.md" | \
           pi --provider openrouter \
              --model anthropic/claude-sonnet-4-6 \
              --no-session \
-             -p "${SKILL}
-
-          ---
-
-          You are running in MODE B (template generation) of the skill above.
-
+             -p "The above is the mcp-hub-setup skill. Execute MODE B exactly as specified.
           Source agent-kit is at: ${{ github.workspace }}
           Your working directory is the mcp-task-hub checkout.
           Triggering commit: ${{ github.sha }}
-
-          Execute MODE B exactly as specified. Do NOT run docker compose or any
-          interactive commands. Write all files, then stop — the PR step will commit."
+          Do NOT run docker compose or any interactive commands.
+          Write all files, then stop — the PR step will commit."
 
       - name: Open PR on mcp-task-hub
         uses: peter-evans/create-pull-request@v6
