@@ -14,8 +14,6 @@ jobs:
     steps:
       - name: Checkout agent-kit
         uses: actions/checkout@v4
-        with:
-          path: agent-kit
 
       - name: Checkout mcp-task-hub
         uses: actions/checkout@v4
@@ -25,7 +23,7 @@ jobs:
           token: ${{ secrets.TEMPLATE_REPO_TOKEN }}
 
       - name: Install pi
-        run: npm install -g @mariozechner/pi-coding-agent
+        run: pnpm add -g @mariozechner/pi-coding-agent
 
       - name: Run mcp-hub-setup skill (Mode B)
         env:
@@ -35,11 +33,11 @@ jobs:
           pi --provider openrouter \
              --model anthropic/claude-sonnet-4-6 \
              --no-session \
-             -p "@${{ github.workspace }}/agent-kit/.agents/skills/mcp-hub-setup/SKILL.md
+             -p "@${{ github.workspace }}/.agents/skills/mcp-hub-setup/SKILL.md
 
           You are running in MODE B (template generation) of the mcp-hub-setup skill above.
 
-          Source agent-kit is at: ${{ github.workspace }}/agent-kit
+          Source agent-kit is at: ${{ github.workspace }}
           Your working directory is the mcp-task-hub checkout.
           Triggering commit: ${{ github.sha }}
 

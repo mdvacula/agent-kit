@@ -16,8 +16,6 @@ jobs:
     steps:
       - name: Checkout agent-kit
         uses: actions/checkout@v4
-        with:
-          path: agent-kit
 
       - name: Checkout agent-template
         uses: actions/checkout@v4
@@ -27,7 +25,7 @@ jobs:
           token: ${{ secrets.TEMPLATE_REPO_TOKEN }}
 
       - name: Install pi
-        run: npm install -g @mariozechner/pi-coding-agent
+        run: pnpm add -g @mariozechner/pi-coding-agent
 
       - name: Run agentic-setup skill (Mode B)
         env:
@@ -37,11 +35,11 @@ jobs:
           pi --provider openrouter \
              --model anthropic/claude-sonnet-4-6 \
              --no-session \
-             -p "@${{ github.workspace }}/agent-kit/.agents/skills/agentic-setup/SKILL.md
+             -p "@${{ github.workspace }}/.agents/skills/agentic-setup/SKILL.md
 
           You are running in MODE B (template generation) of the agentic-setup skill above.
 
-          Source agent-kit is at: ${{ github.workspace }}/agent-kit
+          Source agent-kit is at: ${{ github.workspace }}
           Your working directory is the agent-template checkout.
           Triggering commit: ${{ github.sha }}
 
