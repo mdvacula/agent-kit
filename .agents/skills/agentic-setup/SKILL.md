@@ -707,11 +707,10 @@ Ready-to-clone scaffold for agentic projects using **OpenCode** and **pi**.
 | `AGENTS.md` | Workflow reference for all agents |
 | `opencode.json` | OpenCode config — MCP Task Hub endpoint |
 | `.opencode/agents/` | hub-runner, hub-orchestrator, openspec-orchestrator |
-| `.opencode/skills/` | OpenSpec skills + agentic-setup skill |
+| `.opencode/skills/` | OpenSpec skills |
 | `.opencode/commands/` | OpenSpec slash commands (`/opsx-*`) |
-| `.pi/agents/` | hub-runner, hub-orchestrator, openspec-orchestrator |
-| `.pi/skills/` | OpenSpec skills + agentic-setup skill |
-| `.pi/prompts/` | OpenSpec slash commands (`/opsx-*`) |
+| `.pi/skills/` | OpenSpec skills |
+| `.pi/prompts/` | OpenSpec prompts (`/opsx-*`) + `/hub-run` |
 | `openspec/specs/living-spec.md` | Living Spec starter |
 | `openspec/config.yaml` | OpenSpec schema + context |
 
@@ -736,12 +735,6 @@ Generated from [agent-kit](https://github.com/mdvacula/agent-kit) by the agentic
 
 ## B3 — Copy Source Files
 
-Copy the `.agents/` directory so the template carries skill discovery with it:
-
-```
-agent-kit/.agents/  →  .agents/
-```
-
 OpenCode agents (pi has no agent concept):
 
 ```
@@ -755,16 +748,12 @@ Commands and prompt templates:
 ```
 agent-kit/commands/shared/*.md   → .opencode/commands/  AND  .pi/prompts/
 agent-kit/commands/opencode/*.md → .opencode/commands/
-agent-kit/commands/pi/*.md       → .pi/prompts/
+agent-kit/commands/pi/*.md       → .pi/prompts/         (includes hub-run.md)
 ```
 
-Skills (from `skills/`):
-
-```
-agent-kit/skills/shared/*   → .agents/skills/     (both tools)
-agent-kit/skills/opencode/* → .opencode/skills/
-agent-kit/skills/pi/*       → .agents/skills/     (pi discovers via .agents/skills/)
-```
+Do NOT copy `.agents/skills/` into the template. Setup skills (`agentic-setup`,
+`mcp-hub-setup`) are for bootstrapping new projects — they do not belong in a
+project that has already been set up.
 
 ---
 
@@ -777,19 +766,24 @@ AGENTS.md
 README.md
 .gitignore
 opencode.json
-.agents/skills/agentic-setup/SKILL.md
-.agents/skills/agentic-setup/REFERENCE.md
-.agents/skills/mcp-hub-setup/SKILL.md
 .opencode/agents/hub-runner.md
 .opencode/agents/hub-orchestrator.md
 .opencode/agents/openspec-orchestrator.md
 .opencode/commands/opsx-propose.md
 .pi/prompts/opsx-propose.md
+.pi/prompts/hub-run.md
 openspec/config.yaml
 openspec/specs/living-spec.md
 ```
 
 If any are missing, write them before proceeding.
+
+Confirm the following do NOT exist (remove if present):
+
+```
+.agents/skills/agentic-setup/
+.agents/skills/mcp-hub-setup/
+```
 
 ---
 
@@ -804,5 +798,30 @@ $(git diff --cached --name-only)"
 ```
 
 Then open a pull request against `agent-template/main`.
-The PR description should list which source files changed and link to the
-triggering commit in `agent-kit`.
+
+---
+
+## B6 — Write PR Metadata
+
+After all file changes are complete, write two files so the workflow can create
+a meaningful pull request instead of a generic SHA-based title:
+
+**`/tmp/pr-title.txt`** — a single line describing what actually changed.
+Base it on the real diff, not the commit SHA.
+Good: `feat(template): add hub-run prompt for autonomous task execution`
+Bad:  `chore(template): sync from agent-kit <sha>`
+
+**`/tmp/pr-body.md`** — structured markdown:
+
+```markdown
+## What changed
+- <file or directory>: <what was added/updated and why>
+- ...
+
+## Why
+<one or two sentences — what this sync enables or fixes for developers
+using the template>
+```
+
+The workflow reads these files to populate the PR title and description.
+If they are not written, the workflow falls back to a generic SHA-based title.
