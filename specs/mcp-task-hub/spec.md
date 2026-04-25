@@ -1,7 +1,7 @@
 # MCP Task Hub
 
 **Capability:** Centralized task execution state over Model Context Protocol  
-**Status:** Proposed  
+**Status:** Implemented  
 **Priority:** P0 — everything else depends on this
 
 ---
@@ -16,7 +16,7 @@ by the server — never by the repo or the agent.
 The task schema follows the [TaskMD](https://driangle.github.io/taskmd/) model:
 each record carries a stable ID, a title, a status, and a free-form metadata
 bag that agents use to link tasks back to spec references, priority, dependency
-chains, and Entire session recordings.
+chains, and session recordings.
 
 ---
 
@@ -45,7 +45,7 @@ Agents should use these keys consistently so the hub can be queried predictably.
 | `type` | string | `task` · `feature` · `chore` |
 | `blockedBy` | string[] | IDs of tasks that must complete first |
 | `blocks` | string[] | IDs of tasks this one unblocks |
-| `entireSessionId` | string | Entire session ID recorded during implementation |
+| `entireSessionId` | string | Session ID recorded during implementation |
 | `notes` | string | Free-form agent notes |
 
 ---
@@ -77,7 +77,7 @@ Used by `openspec-orchestrator` to sync requirements from the Living Spec to the
 
 ### `fetch_tasks`
 
-Query tasks. At least one filter must be supplied.
+Query tasks. All filters are optional — omitting all returns every task.
 
 **Input:**
 
@@ -90,7 +90,7 @@ Query tasks. At least one filter must be supplied.
 **Returns:** Array of task records, ordered by `priority` (P0 first) then `created_at` ascending.
 
 **Behaviour:**
-- `id` and `status` may be combined
+- Filters are ANDed; `change` filters on `metadata.change` post-query
 - Returns empty array (not an error) when no tasks match
 - `priority` sort order: `P0` → `P1` → `P2` → null
 
@@ -141,7 +141,7 @@ The port and host are configurable via environment variables:
 |-----|---------|-------------|
 | `HUB_HOST` | `0.0.0.0` | Bind address |
 | `HUB_PORT` | `8000` | Port |
-| `HUB_DB_PATH` | `./hub.db` | SQLite file path |
+| `HUB_DB_PATH` | `/data/hub.db` | SQLite file path (inside Docker container) |
 | `HUB_LOG_LEVEL` | `INFO` | `DEBUG` · `INFO` · `WARNING` |
 
 ---
@@ -160,38 +160,39 @@ The port and host are configurable via environment variables:
 
 - Authentication / API keys (trusted local network assumed)
 - Multi-user / multi-project isolation (use separate hub instances per project)
-- Task history / audit log (covered by Entire session recordings)
+- Task history / audit log
 - Push notifications to agents (agents poll)
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] `sync_task` creates a new task with correct fields
-- [ ] `sync_task` updates an existing task, merging metadata
-- [ ] `fetch_tasks(status="pending")` returns tasks in priority order
-- [ ] `fetch_tasks(id="x")` returns exactly that task or empty array
-- [ ] `update_task_status` transitions status and updates `updated_at`
-- [ ] `update_task_status` errors on unknown ID
-- [ ] `/health` returns 200 with task count
-- [ ] `/tasks` returns all tasks as JSON
-- [ ] `/tasks/<id>` returns a single task or 404
+- [x] `sync_task` creates a new task with correct fields
+- [x] `sync_task` updates an existing task, merging metadata
+- [x] `fetch_tasks(status="pending")` returns tasks in priority order
+- [x] `fetch_tasks(id="x")` returns exactly that task or empty array
+- [x] `update_task_status` transitions status and updates `updated_at`
+- [x] `update_task_status` errors on unknown ID
+- [x] `/health` returns 200 with task count
+- [x] `/tasks` returns all tasks as JSON
+- [x] `/tasks/<id>` returns a single task or 404
 - [ ] Server starts in under 2 seconds
 - [ ] Hub survives restart — tasks persist in SQLite
 - [ ] Two agents connected simultaneously both see consistent state
-- [ ] Generated repo includes automated tests for store and HTTP routes
-- [ ] Setup workflow includes dependency install, build, and verification steps
-- [ ] Generated repo passes `python -m compileall .`
-- [ ] Generated repo passes `pytest`
-- [ ] Generated repo builds and starts successfully with `docker compose build` and `docker compose up -d`
-- [ ] Generated repo verifies `/health` and `/tasks` via HTTP after startup
+- [x] Generated repo includes automated tests for store and HTTP routes
+- [x] Setup workflow includes dependency install, build, and verification steps
+- [x] Generated repo passes `python -m compileall .`
+- [x] Generated repo passes `pytest`
+- [x] Generated repo builds and starts successfully with `docker compose build` and `docker compose up -d`
+- [x] Generated repo verifies `/health` and `/tasks` via HTTP after startup
 
 ---
 
 ## Dependencies
 
-- Python 3.11+
+- Python 3.12+
 - `mcp[cli]` — MCP server framework
-- `aiohttp` or `starlette` — HTTP health/read endpoints
+- `starlette` + `uvicorn` — HTTP health/read endpoints
 - `aiosqlite` — async SQLite driver
+- `python-dotenv` — environment configuration
 - No external services required

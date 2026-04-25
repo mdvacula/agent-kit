@@ -1,0 +1,72 @@
+name: Sync agent-template
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'agents/**'
+      - '.agents/skills/agentic-setup/**'
+      - 'skills/**'
+      - 'commands/**'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout agent-kit
+        uses: actions/checkout@v4
+        with:
+          path: agent-kit
+
+      - name: Checkout agent-template
+        uses: actions/checkout@v4
+        with:
+          repository: mdvacula/agent-template
+          path: agent-template
+          token: ${{ secrets.TEMPLATE_REPO_TOKEN }}
+
+      - name: Install pi
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Run agentic-setup skill (Mode B)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        working-directory: agent-template
+        run: |
+          claude --dangerously-skip-permissions -p "$(cat <<'EOF'
+          You are running in MODE B (template generation) of the agentic-setup skill.
+
+          Source agent-kit is at: ${{ github.workspace }}/agent-kit
+          Your working directory is the agent-template checkout.
+          Triggering commit: ${{ github.sha }}
+
+          Load and follow the skill at:
+          ${{ github.workspace }}/agent-kit/.agents/skills/agentic-setup/SKILL.md
+
+          Execute MODE B exactly as specified. Leave PROJECT_NAME, TECH_STACK, and
+          all other placeholder variables unsubstituted as literal strings.
+          Do NOT run git commit — the PR step handles that.
+          EOF
+          )"
+
+      - name: Open PR on agent-template
+        uses: peter-evans/create-pull-request@v6
+        with:
+          path: agent-template
+          token: ${{ secrets.TEMPLATE_REPO_TOKEN }}
+          commit-message: "chore(template): sync from agent-kit ${{ github.sha }}"
+          branch: "sync/agent-kit-${{ github.sha }}"
+          title: "chore(template): sync from agent-kit ${{ github.sha }}"
+          body: |
+            Automated sync from agent-kit.
+
+            **Triggered by changes to:**
+            - `agents/`
+            - `.agents/skills/agentic-setup/`
+            - `skills/`
+            - `commands/`
+
+            **Triggering commit:** ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
+
+            Review the diff and merge when ready.

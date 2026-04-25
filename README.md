@@ -11,7 +11,7 @@ agent-kit/
 │   ├── agentic-setup/          ← bootstrap a project (dual-mode: local / template)
 │   │   ├── SKILL.md
 │   │   └── REFERENCE.md
-│   └── mcp-hub-setup/          ← set up the MCP Task Hub
+│   └── mcp-hub-setup/          ← set up the MCP Task Hub (dual-mode: local / generate)
 │       └── SKILL.md
 │
 ├── agents/
@@ -31,15 +31,18 @@ agent-kit/
 │   └── pi/                     ← pi prompt templates (.pi/prompts/) — supports $1/$@ args
 │
 ├── specs/                      ← living specs for kit components
-│   └── mcp-task-hub/
-│       └── spec.md
+│   ├── agent-kit/spec.md       ← this repo's own spec
+│   └── mcp-task-hub/spec.md    ← MCP Task Hub service spec
+│
+├── tests/
+│   └── test_hub_integration.py ← smoke tests against the live hub (stdlib only)
 │
 ├── .opencode/                  ← makes agents/skills live in OpenCode when editing agent-kit
 │   └── agents/                 (symlinks → agents/opencode/)
 │
 └── .github/workflows/
-    ├── sync-template.yml       ← push → pi agent → PR on agent-template
-    └── sync-hub.yml            ← push → pi agent → PR on mcp-task-hub
+    ├── sync-template.yml       ← push → claude agent → PR on agent-template
+    └── sync-hub.yml            ← push → claude agent → PR on mcp-task-hub
 ```
 
 ## Three output repos
@@ -50,24 +53,59 @@ agent-kit/
 | `mcp-task-hub` | Docker service — centralized task state | `git clone github.com/mdvacula/mcp-task-hub ~/mcp-task-hub` |
 | `agent-kit` | This repo — source of truth | Edit here, outputs update via Actions |
 
-## How to use this locally
+## Quick start
 
 ### 1. Start the hub (once, outside any project)
 
 ```bash
 git clone https://github.com/mdvacula/mcp-task-hub ~/mcp-task-hub
-cd ~/mcp-task-hub && cp .env.example .env
+cd ~/mcp-task-hub
+cp .env.example .env
 docker compose up -d
-curl http://localhost:8000/health   # → {"status":"ok","task_count":0}
+
+# Verify it's healthy
+curl http://localhost:8000/health
+# → {"status":"ok","task_count":0}
 ```
 
-Or run the `mcp-hub-setup` skill (Mode A) to generate the hub from scratch.
-
-### 2. Bootstrap a new project
+### 2. Bootstrap a new project from the template
 
 ```bash
 git clone https://github.com/mdvacula/agent-template my-project
-# or invoke the agentic-setup skill (Mode A) in any existing project
+cd my-project
+
+# Edit the two placeholder files
+#   openspec/config.yaml      — fill in PROJECT_NAME, TECH_STACK
+#   AGENTS.md                 — replace PROJECT_NAME references
+
+# Wire up git notes fetch refspec (run once per clone)
+git config --add remote.origin.fetch '+refs/notes/*:refs/notes/*'
+```
+
+### 3. Verify the MCP connection
+
+Open OpenCode in your project and run:
+
+```
+fetch_tasks(status="pending")
+```
+
+An empty array `[]` confirms the hub is reachable and the MCP tool is wired up.
+
+### 4. Bootstrap an existing project
+
+Instead of cloning the template, invoke the `agentic-setup` skill directly
+from inside your project in OpenCode:
+
+```
+/skill agentic-setup
+```
+
+### 5. Run integration tests (optional)
+
+```bash
+# From agent-kit, with hub running
+python -m pytest tests/test_hub_integration.py -v
 ```
 
 ## How the GitHub Actions work
@@ -75,20 +113,27 @@ git clone https://github.com/mdvacula/agent-template my-project
 ```
 push to agent-kit/main
         │
-        ├── changed skills/mcp-hub-setup/ or specs/mcp-task-hub/
-        │         └── sync-hub.yml → pi agent (Mode B) → PR on mcp-task-hub
+        ├── changed .agents/skills/mcp-hub-setup/ or specs/mcp-task-hub/
+        │         └── sync-hub.yml → claude agent (Mode B) → PR on mcp-task-hub
         │
         └── changed agents/, .agents/skills/agentic-setup/, skills/, or commands/
-                  └── sync-template.yml → pi agent (Mode B) → PR on agent-template
+                  └── sync-template.yml → claude agent (Mode B) → PR on agent-template
 ```
 
 Both actions run independently. Merge the PRs when you've reviewed the diff.
+
+Required secrets on the `agent-kit` repo:
+
+| Secret | Purpose |
+|--------|---------|
+| `TEMPLATE_REPO_TOKEN` | GitHub PAT with `repo` scope — write access to `agent-template` and `mcp-task-hub` |
+| `ANTHROPIC_API_KEY` | API key for the claude agent that runs Mode B |
 
 ## Toolchain docs
 
 | Tool | Docs |
 |------|------|
-| Entire | [docs.entire.io](https://docs.entire.io/) |
 | MCP | [modelcontextprotocol.io](https://modelcontextprotocol.io/) |
 | TaskMD | [driangle.github.io/taskmd](https://driangle.github.io/taskmd/) |
 | OpenSpec | [openspec.dev](https://openspec.dev/) |
+| OpenCode | [opencode.ai/docs](https://opencode.ai/docs) |

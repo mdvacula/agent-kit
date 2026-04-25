@@ -1,0 +1,67 @@
+name: Sync mcp-task-hub
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.agents/skills/mcp-hub-setup/SKILL.md'
+      - 'specs/mcp-task-hub/spec.md'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout agent-kit
+        uses: actions/checkout@v4
+        with:
+          path: agent-kit
+
+      - name: Checkout mcp-task-hub
+        uses: actions/checkout@v4
+        with:
+          repository: mdvacula/mcp-task-hub
+          path: mcp-task-hub
+          token: ${{ secrets.TEMPLATE_REPO_TOKEN }}
+
+      - name: Install pi
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Run mcp-hub-setup skill (Mode B)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        working-directory: mcp-task-hub
+        run: |
+          claude --dangerously-skip-permissions -p "$(cat <<'EOF'
+          You are running in MODE B (template generation) of the mcp-hub-setup skill.
+
+          Source agent-kit is at: ${{ github.workspace }}/agent-kit
+          Your working directory is the mcp-task-hub checkout.
+          Triggering commit: ${{ github.sha }}
+
+          Load and follow the skill at:
+          ${{ github.workspace }}/agent-kit/.agents/skills/mcp-hub-setup/SKILL.md
+
+          Execute MODE B exactly as specified. Do NOT run docker compose or any
+          interactive commands. Write all files, then stop — the PR step will commit.
+          EOF
+          )"
+
+      - name: Open PR on mcp-task-hub
+        uses: peter-evans/create-pull-request@v6
+        with:
+          path: mcp-task-hub
+          token: ${{ secrets.TEMPLATE_REPO_TOKEN }}
+          commit-message: "chore(hub): sync from agent-kit ${{ github.sha }}"
+          branch: "sync/agent-kit-${{ github.sha }}"
+          title: "chore(hub): sync from agent-kit ${{ github.sha }}"
+          body: |
+            Automated sync from agent-kit.
+
+            **Triggered by changes to:**
+            - `.agents/skills/mcp-hub-setup/SKILL.md`
+            - `specs/mcp-task-hub/spec.md`
+
+            **Triggering commit:** ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
+
+            Review the diff and merge when ready.
