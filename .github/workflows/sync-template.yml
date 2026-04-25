@@ -41,7 +41,43 @@ jobs:
           Your working directory is the agent-template checkout.
           Triggering commit: ${{ github.sha }}
           Leave PROJECT_NAME, TECH_STACK, and all other placeholder variables unsubstituted as literal strings.
-          Do NOT run git commit — the PR step handles that."
+          Do NOT run git commit — the PR step handles that.
+
+          When you are done, write two files:
+          1. /tmp/pr-title.txt — a single line, plain text PR title that describes what actually changed.
+             Good example: 'feat(template): add hub-run prompt and wire OpenCode agents'
+             Bad example:  'chore(template): sync from agent-kit <sha>'
+          2. /tmp/pr-body.md — a markdown PR body with:
+             ## What changed
+             - bullet list of the specific files added/updated and why
+             ## Why
+             one or two sentences explaining what this sync enables or fixes
+             ## Source
+             Triggered by commit: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}"
+
+      - name: Read PR metadata
+        id: pr
+        run: |
+          if [ -f /tmp/pr-title.txt ]; then
+            echo "title=$(cat /tmp/pr-title.txt)" >> $GITHUB_OUTPUT
+          else
+            echo "title=chore(template): sync from agent-kit ${{ github.sha }}" >> $GITHUB_OUTPUT
+          fi
+          if [ -f /tmp/pr-body.md ]; then
+            {
+              echo 'body<<PR_BODY_EOF'
+              cat /tmp/pr-body.md
+              echo 'PR_BODY_EOF'
+            } >> $GITHUB_OUTPUT
+          else
+            {
+              echo 'body<<PR_BODY_EOF'
+              echo 'Automated sync from agent-kit.'
+              echo ''
+              echo "Source commit: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}"
+              echo 'PR_BODY_EOF'
+            } >> $GITHUB_OUTPUT
+          fi
 
       - name: Open PR on agent-template
         uses: peter-evans/create-pull-request@v6
@@ -50,16 +86,5 @@ jobs:
           token: ${{ secrets.TEMPLATE_REPO_TOKEN }}
           commit-message: "chore(template): sync from agent-kit ${{ github.sha }}"
           branch: "sync/agent-kit-${{ github.sha }}"
-          title: "chore(template): sync from agent-kit ${{ github.sha }}"
-          body: |
-            Automated sync from agent-kit.
-
-            **Triggered by changes to:**
-            - `agents/`
-            - `.agents/skills/agentic-setup/`
-            - `skills/`
-            - `commands/`
-
-            **Triggering commit:** ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
-
-            Review the diff and merge when ready.
+          title: ${{ steps.pr.outputs.title }}
+          body: ${{ steps.pr.outputs.body }}
