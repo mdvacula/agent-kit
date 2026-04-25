@@ -1,0 +1,1 @@
+../../../agents/opencode/hub-runner.md
