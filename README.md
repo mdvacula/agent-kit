@@ -41,8 +41,8 @@ agent-kit/
 │   └── agents/                 (symlinks → agents/opencode/)
 │
 └── .github/workflows/
-    ├── sync-template.yml       ← push → claude agent → PR on agent-template
-    └── sync-hub.yml            ← push → claude agent → PR on mcp-task-hub
+    ├── sync-template.yml       ← push → pi agent → PR on agent-template
+    └── sync-hub.yml            ← push → pi agent → PR on mcp-task-hub
 ```
 
 ## Three output repos
@@ -108,16 +108,63 @@ from inside your project in OpenCode:
 python -m pytest tests/test_hub_integration.py -v
 ```
 
+## What the harness unlocks
+
+Once a project is bootstrapped with `agentic-setup`, both pi and OpenCode have the full development loop:
+
+```
+Idea → spec → tasks in hub → agent picks up tasks → implements → commits → pushes → done
+```
+
+### With pi
+
+```bash
+# Propose a change: idea → spec artifacts → tasks synced to hub
+/opsx-propose
+
+# Execute next pending task end-to-end (auto-picks, no args needed)
+/hub-run
+
+# Loop /hub-run until the queue is empty
+```
+
+### With OpenCode
+
+```bash
+# Propose and plan (same OpenSpec commands)
+/opsx-propose
+
+# Run a single task
+@hub-runner
+
+# Clear an entire backlog in parallel
+@hub-orchestrator
+```
+
+### The full loop
+
+```
+/opsx-propose           ← agent creates spec + tasks, syncs to hub
+/hub-run (or @hub-runner) ← agent claims next task, implements, commits, pushes
+/hub-run ...            ← repeat until fetch_tasks(status="pending") returns []
+```
+
+Everything is tracked in the hub. Every task commit gets a Git Note on
+`refs/notes/agent-log` — a permanent AI-blame record of what was done and why,
+stored in the repo itself with zero extra files.
+
+---
+
 ## How the GitHub Actions work
 
 ```
 push to agent-kit/main
         │
         ├── changed .agents/skills/mcp-hub-setup/ or specs/mcp-task-hub/
-        │         └── sync-hub.yml → claude agent (Mode B) → PR on mcp-task-hub
+        │         └── sync-hub.yml → pi agent (Mode B) → PR on mcp-task-hub
         │
         └── changed agents/, .agents/skills/agentic-setup/, skills/, or commands/
-                  └── sync-template.yml → claude agent (Mode B) → PR on agent-template
+                  └── sync-template.yml → pi agent (Mode B) → PR on agent-template
 ```
 
 Both actions run independently. Merge the PRs when you've reviewed the diff.
@@ -127,7 +174,7 @@ Required secrets on the `agent-kit` repo:
 | Secret | Purpose |
 |--------|---------|
 | `TEMPLATE_REPO_TOKEN` | GitHub PAT with `repo` scope — write access to `agent-template` and `mcp-task-hub` |
-| `ANTHROPIC_API_KEY` | API key for the claude agent that runs Mode B |
+| `OPENROUTER_API_KEY` | OpenRouter API key — used by pi (`anthropic/claude-sonnet-4-6`) to run Mode B |
 
 ## Toolchain docs
 
@@ -137,3 +184,4 @@ Required secrets on the `agent-kit` repo:
 | TaskMD | [driangle.github.io/taskmd](https://driangle.github.io/taskmd/) |
 | OpenSpec | [openspec.dev](https://openspec.dev/) |
 | OpenCode | [opencode.ai/docs](https://opencode.ai/docs) |
+| pi | [github.com/badlogic/pi-mono](https://github.com/badlogic/pi-mono) |

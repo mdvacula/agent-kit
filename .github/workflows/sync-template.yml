@@ -27,28 +27,27 @@ jobs:
           token: ${{ secrets.TEMPLATE_REPO_TOKEN }}
 
       - name: Install pi
-        run: npm install -g @anthropic-ai/claude-code
+        run: npm install -g @mariozechner/pi-coding-agent
 
       - name: Run agentic-setup skill (Mode B)
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         working-directory: agent-template
         run: |
-          claude --dangerously-skip-permissions -p "$(cat <<'EOF'
-          You are running in MODE B (template generation) of the agentic-setup skill.
+          pi --provider openrouter \
+             --model anthropic/claude-sonnet-4-6 \
+             --no-session \
+             -p "@${{ github.workspace }}/agent-kit/.agents/skills/agentic-setup/SKILL.md
+
+          You are running in MODE B (template generation) of the agentic-setup skill above.
 
           Source agent-kit is at: ${{ github.workspace }}/agent-kit
           Your working directory is the agent-template checkout.
           Triggering commit: ${{ github.sha }}
 
-          Load and follow the skill at:
-          ${{ github.workspace }}/agent-kit/.agents/skills/agentic-setup/SKILL.md
-
           Execute MODE B exactly as specified. Leave PROJECT_NAME, TECH_STACK, and
           all other placeholder variables unsubstituted as literal strings.
-          Do NOT run git commit — the PR step handles that.
-          EOF
-          )"
+          Do NOT run git commit — the PR step handles that."
 
       - name: Open PR on agent-template
         uses: peter-evans/create-pull-request@v6

@@ -68,6 +68,12 @@ They are separate from `.agents/skills/` (which is auto-discovered).
 | `commands/opencode/` | OpenCode commands (`.opencode/commands/`) |
 | `commands/pi/` | pi prompt templates (`.pi/prompts/`) — supports `$1`/`$@` args |
 
+**Installed pi prompt templates:**
+
+| Prompt | Invocation | Purpose |
+|--------|-----------|---------|
+| `hub-run.md` | `/hub-run` | Pick next pending task from hub, execute end-to-end, push, close |
+
 ### `specs/` — living specs for kit components
 
 | Spec | Subject |
@@ -82,8 +88,8 @@ GitHub Action runs a pi agent to regenerate the downstream repo.
 
 | Workflow | Trigger | Action |
 |----------|---------|--------|
-| `sync-hub.yml` | Changes to `skills/mcp-hub-setup/` or `specs/mcp-task-hub/` | pi agent (Mode B) → PR on `mcp-task-hub` |
-| `sync-template.yml` | Changes to `agents/`, `.agents/skills/agentic-setup/`, `skills/`, or `commands/` | pi agent (Mode B) → PR on `agent-template` |
+| `sync-hub.yml` | Changes to `.agents/skills/mcp-hub-setup/` or `specs/mcp-task-hub/` | pi agent (`anthropic/claude-sonnet-4-6` via OpenRouter) → PR on `mcp-task-hub` |
+| `sync-template.yml` | Changes to `agents/`, `.agents/skills/agentic-setup/`, `skills/`, or `commands/` | pi agent (`anthropic/claude-sonnet-4-6` via OpenRouter) → PR on `agent-template` |
 
 ---
 
@@ -134,11 +140,12 @@ Tests live in `tests/test_hub_integration.py`.
 - [x] `.opencode/agents/` symlinks point to `agents/opencode/`
 - [x] `specs/mcp-task-hub/spec.md` is accurate and up to date
 - [x] `specs/agent-kit/spec.md` exists (this file)
-- [ ] `sync-hub.yml` runs a real pi agent (not an echo stub)
-- [ ] `sync-template.yml` runs a real pi agent (not an echo stub)
+- [x] `sync-hub.yml` runs a real pi agent (`@mariozechner/pi-coding-agent` via OpenRouter)
+- [x] `sync-template.yml` runs a real pi agent (`@mariozechner/pi-coding-agent` via OpenRouter)
 - [x] Integration tests exist in `tests/test_hub_integration.py`
 - [ ] Integration tests run in CI (requires hub as a service in the workflow)
-- [ ] `skills/` and `commands/` directories contain at least one non-stub file
+- [x] `commands/pi/hub-run.md` exists — pi prompt for end-to-end task execution
+- [ ] `skills/` directory contains at least one non-stub file
 
 ---
 
