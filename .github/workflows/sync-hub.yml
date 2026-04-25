@@ -23,7 +23,7 @@ jobs:
           token: ${{ secrets.TEMPLATE_REPO_TOKEN }}
 
       - name: Install pi
-        run: pnpm add -g @mariozechner/pi-coding-agent
+        run: npm install -g @mariozechner/pi-coding-agent
 
       - name: Run mcp-hub-setup skill (Mode B)
         env:
