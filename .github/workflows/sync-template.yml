@@ -32,12 +32,15 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         working-directory: agent-template
         run: |
+          SKILL=$(cat "${{ github.workspace }}/.agents/skills/agentic-setup/SKILL.md")
           pi --provider openrouter \
              --model anthropic/claude-sonnet-4-6 \
              --no-session \
-             -p "@${{ github.workspace }}/.agents/skills/agentic-setup/SKILL.md
+             -p "${SKILL}
 
-          You are running in MODE B (template generation) of the agentic-setup skill above.
+          ---
+
+          You are running in MODE B (template generation) of the skill above.
 
           Source agent-kit is at: ${{ github.workspace }}
           Your working directory is the agent-template checkout.
