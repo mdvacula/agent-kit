@@ -58,24 +58,25 @@ jobs:
       - name: Read PR metadata
         id: pr
         run: |
+          DELIM="EOF_$(openssl rand -hex 16)"
           if [ -f /tmp/pr-title.txt ]; then
-            echo "title=$(cat /tmp/pr-title.txt)" >> $GITHUB_OUTPUT
+            echo "title=$(head -1 /tmp/pr-title.txt)" >> $GITHUB_OUTPUT
           else
             echo "title=chore(template): sync from agent-kit ${{ github.sha }}" >> $GITHUB_OUTPUT
           fi
           if [ -f /tmp/pr-body.md ]; then
             {
-              echo 'body<<PR_BODY_EOF'
+              echo "body<<${DELIM}"
               cat /tmp/pr-body.md
-              echo 'PR_BODY_EOF'
+              echo "${DELIM}"
             } >> $GITHUB_OUTPUT
           else
             {
-              echo 'body<<PR_BODY_EOF'
+              echo "body<<${DELIM}"
               echo 'Automated sync from agent-kit.'
               echo ''
               echo "Source commit: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}"
-              echo 'PR_BODY_EOF'
+              echo "${DELIM}"
             } >> $GITHUB_OUTPUT
           fi
 
