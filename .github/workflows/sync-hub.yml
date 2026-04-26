@@ -32,7 +32,7 @@ jobs:
         run: |
           cat "${{ github.workspace }}/.agents/skills/mcp-hub-setup/SKILL.md" | \
           pi --provider openrouter \
-             --model moonshotai/kimi-k2 \
+             --model openai/gpt-5.4-nano \
              --no-session \
              -p "The above is the mcp-hub-setup skill. Execute MODE B exactly as specified.
           Source agent-kit is at: ${{ github.workspace }}
@@ -42,36 +42,28 @@ jobs:
           Write all files, then stop — the PR step will commit.
 
           When you are done, write two files:
-          1. /tmp/pr-title.txt — a single line, plain text PR title that describes what actually changed.
-             Good example: 'fix(hub): correct aiosqlite connection lifecycle'
-             Bad example:  'chore(hub): sync from agent-kit <sha>'
-          2. /tmp/pr-body.md — a markdown PR body with:
-             ## What changed
-             - bullet list of the specific files added/updated and why
-             ## Why
-             one or two sentences explaining what this sync enables or fixes
-             ## Source
-             Triggered by commit: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}"
+          1. /tmp/pr-title.txt — a single line PR title describing what actually changed.
+             Example: 'fix(hub): correct aiosqlite connection lifecycle'
+          2. /tmp/pr-body.md — markdown with: ## What changed (bullets), ## Why (1-2 sentences), ## Source (commit URL)"
 
       - name: Read PR metadata
         id: pr
         run: |
           if [ -f /tmp/pr-title.txt ]; then
-            echo "title=$(head -1 /tmp/pr-title.txt)" >> $GITHUB_OUTPUT
+            echo "title=$(head -1 /tmp/pr-title.txt)" >> "$GITHUB_OUTPUT"
           else
-            echo "title=chore(hub): sync from agent-kit ${{ github.sha }}" >> $GITHUB_OUTPUT
+            echo "title=chore(hub): sync from agent-kit ${{ github.sha }}" >> "$GITHUB_OUTPUT"
           fi
           if [ -f /tmp/pr-body.md ]; then
-            python3 - "$GITHUB_OUTPUT" /tmp/pr-body.md <<'PYSCRIPT'
+            python3 -c "
 import sys, secrets
-out, body_file = sys.argv[1], sys.argv[2]
-body = open(body_file).read()
-delim = "BODY_" + secrets.token_hex(32)
-with open(out, "a") as f:
-    f.write(f"body<<{delim}\n{body}\n{delim}\n")
-PYSCRIPT
+body = open('/tmp/pr-body.md').read()
+delim = 'BODY_' + secrets.token_hex(32)
+with open(sys.argv[1], 'a') as f:
+    f.write(f'body<<{delim}\n{body}\n{delim}\n')
+" "$GITHUB_OUTPUT"
           else
-            echo "body=Automated sync from agent-kit. Source: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}" >> $GITHUB_OUTPUT
+            echo "body=Automated sync from agent-kit. Source: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Open PR on mcp-task-hub
