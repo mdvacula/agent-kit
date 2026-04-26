@@ -579,11 +579,14 @@ async def lifespan(app: Starlette) -> AsyncIterator[None]:
 
 app = Starlette(
     routes=[
-        Mount("/sse", app=mcp.sse_app()),
         *[Route(r.path, r.endpoint) for r in http_routes],
+        Mount("/", app=mcp.sse_app()),
     ],
     lifespan=lifespan,
 )
+# Note: mcp.sse_app() is mounted at "/" (not "/sse") because it internally
+# serves its own routes at /sse and /messages/. Mounting at "/sse" would
+# double the path to /sse/sse — causing 404s on MCP connections.
 
 
 if __name__ == "__main__":
