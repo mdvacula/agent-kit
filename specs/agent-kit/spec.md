@@ -145,7 +145,7 @@ Tests live in `tests/test_hub_integration.py`.
 - [x] Integration tests exist in `tests/test_hub_integration.py`
 - [x] Integration tests run in CI (hub built via docker compose in `.github/workflows/test.yml`)
 - [x] `commands/pi/hub-run.md` exists — pi prompt for end-to-end task execution
-- [ ] `skills/` directory contains at least one non-stub file
+- [x] `skills/shared/git-notes/SKILL.md` — shared skill for agent observability via git notes
 
 ---
 
