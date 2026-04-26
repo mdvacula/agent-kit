@@ -300,7 +300,7 @@ If the hub directory does not exist, stop and tell the user to run
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
     "task-hub": {
-      "type": "remote",
+      "type": "sse",
       "url": "http://localhost:8000/sse",
       "enabled": true
     }
@@ -634,7 +634,7 @@ Write the full contents from Mode A Step A7. This is the same every time.
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
     "task-hub": {
-      "type": "remote",
+      "type": "sse",
       "url": "http://localhost:8000/sse",
       "enabled": true,
       "_comment": "Hub runs via Docker. Start with: cd ~/mcp-task-hub && docker compose up -d. Change port if you edited HUB_PORT in .env."

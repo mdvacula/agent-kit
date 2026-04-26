@@ -92,6 +92,22 @@ fetch_tasks(status="pending")
 
 An empty array `[]` confirms the hub is reachable and the MCP tool is wired up.
 
+OpenCode projects should point `opencode.json` at the hub using SSE transport:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "task-hub": {
+      "type": "sse",
+      "url": "http://localhost:8000/sse",
+      "enabled": true,
+      "_comment": "Hub runs via Docker. Start with: cd ~/mcp-task-hub && docker compose up -d. Change port if you edited HUB_PORT in .env."
+    }
+  }
+}
+```
+
 ### 4. Bootstrap an existing project
 
 Instead of cloning the template, invoke the `agentic-setup` skill directly

@@ -135,6 +135,11 @@ These are read-only convenience endpoints. All writes go through MCP tools.
 
 Default transport is **SSE** on `http://localhost:8000/sse`.
 
+Implementation note: the generated hub must expose an actual MCP transport
+endpoint at `/sse`, not just document the URL. OpenCode and other clients rely
+on that route returning a valid MCP SSE handshake, and a 404 there means the
+hub is not wired correctly even if `/health` is green.
+
 The port and host are configurable via environment variables:
 
 | Var | Default | Description |

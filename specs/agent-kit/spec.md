@@ -123,6 +123,23 @@ GitHub Action runs a pi agent to regenerate the downstream repo.
 These run against `http://localhost:8000` and confirm the hub contract matches
 what the skills and agents expect.
 
+OpenCode projects should configure the task hub with SSE transport in
+`opencode.json`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "task-hub": {
+      "type": "sse",
+      "url": "http://localhost:8000/sse",
+      "enabled": true,
+      "_comment": "Hub runs via Docker. Start with: cd ~/mcp-task-hub && docker compose up -d. Change port if you edited HUB_PORT in .env."
+    }
+  }
+}
+```
+
 ```bash
 # Requires hub running: docker compose -f ~/mcp-task-hub/docker-compose.yml up -d
 python -m pytest tests/ -v

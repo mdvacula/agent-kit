@@ -117,6 +117,21 @@ In any project's `.cursor/mcp.json` set:
 }
 ```
 
+For OpenCode projects, mirror the same SSE endpoint in `opencode.json`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "task-hub": {
+      "type": "sse",
+      "url": "http://localhost:8000/sse",
+      "enabled": true
+    }
+  }
+}
+```
+
 Open Cursor's MCP panel — `task-hub` should appear as connected with three
 tools: `sync_task`, `fetch_tasks`, `update_task_status`.
 
@@ -425,6 +440,11 @@ logging.basicConfig(level=getattr(logging, LOG_LEVEL))
 store = TaskStore(DB_PATH)
 mcp   = FastMCP("task-hub")
 
+# The generated hub must expose a real MCP transport endpoint at `/sse`.
+# A healthy `/health` response is not enough if `/sse` returns 404.
+# OpenCode will fail with a non-200 connection error until the MCP route
+# is actually mounted by the generated server.
+
 
 # ── MCP Tools ────────────────────────────────────────────────────────────────
 
@@ -518,8 +538,13 @@ __all__ = ["mcp", "http_routes", "store", "HOST", "PORT"]
 
 > **Starlette 1.0 compatibility note:** `on_startup`, `on_shutdown`, and
 > `on_event` were all removed in Starlette 1.0. Use the `lifespan` parameter
-> with an `asynccontextmanager` instead. `mcp.get_asgi_app()` is also not
-> available on all `FastMCP` versions — mount MCP routes separately if needed.
+> with an `asynccontextmanager` instead.
+>
+> The generated hub must also expose the MCP transport route. If the installed
+> `FastMCP` version provides an ASGI app helper, mount it at `/sse`. If the
+> helper is named differently in that version, use the documented MCP ASGI
+> entrypoint for the installed package, but do not ship a hub that only exposes
+> `/health` and `/tasks`.
 
 ```python
 """
@@ -559,6 +584,10 @@ app = Starlette(
     routes=[Route(r.path, r.endpoint) for r in http_routes],
     lifespan=lifespan,
 )
+
+# Ensure the MCP transport is mounted on `/sse` in the generated hub.
+# The exact mount call depends on the installed MCP package version.
+# Do not omit this — OpenCode requires a working SSE transport.
 
 
 if __name__ == "__main__":
@@ -614,6 +643,21 @@ Add to `.cursor/mcp.json` in any project:
     "task-hub": {
       "url": "http://localhost:8000/sse",
       "transport": "sse"
+    }
+  }
+}
+```
+
+For OpenCode, use the same server URL in `opencode.json` with `type: "sse"`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "task-hub": {
+      "type": "sse",
+      "url": "http://localhost:8000/sse",
+      "enabled": true
     }
   }
 }

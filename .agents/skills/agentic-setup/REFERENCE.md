@@ -130,7 +130,7 @@ tasks.sqlite
 
 - [ ] `openspec --version` succeeds
 - [ ] `git config --get-all remote.origin.fetch` includes `+refs/notes/*:refs/notes/*`
-- [ ] `opencode.json` contains `mcp.task-hub` config
+- [ ] `opencode.json` contains `mcp.task-hub` config with SSE transport
 - [ ] `fetch_tasks(status="pending")` returns valid response
 - [ ] `AGENTS.md` exists at repo root
 - [ ] `openspec/specs/living-spec.md` exists
