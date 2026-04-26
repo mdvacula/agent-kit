@@ -1,0 +1,17 @@
+schema: spec-driven
+
+context: |
+  Project: agent-kit
+  Tech stack: Python, Docker, GitHub Actions, MCP (FastMCP/Starlette), OpenCode, pi
+  Task hub: http://localhost:8000/sse (Docker — cd ~/mcp-task-hub && docker compose up -d)
+  Zero-bloat rule: task state in hub, observability in git notes (refs/notes/agent-log).
+
+  agent-kit is the source of truth for:
+  - specs/mcp-task-hub/spec.md  → generates mcp-task-hub via sync-hub.yml
+  - specs/agent-kit/spec.md     → documents this repo itself
+  - .agents/skills/             → discoverable skills for OpenCode and pi
+  - agents/opencode/            → OpenCode agent definitions
+  - commands/                   → slash commands for OpenCode and pi
+
+  When making changes to the hub, update specs/mcp-task-hub/spec.md first.
+  Push to main to trigger sync-hub.yml which regenerates mcp-task-hub via PR.
