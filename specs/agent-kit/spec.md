@@ -143,7 +143,7 @@ Tests live in `tests/test_hub_integration.py`.
 - [x] `sync-hub.yml` runs a real pi agent (`@mariozechner/pi-coding-agent` via OpenRouter)
 - [x] `sync-template.yml` runs a real pi agent (`@mariozechner/pi-coding-agent` via OpenRouter)
 - [x] Integration tests exist in `tests/test_hub_integration.py`
-- [ ] Integration tests run in CI (requires hub as a service in the workflow)
+- [x] Integration tests run in CI (hub built via docker compose in `.github/workflows/test.yml`)
 - [x] `commands/pi/hub-run.md` exists — pi prompt for end-to-end task execution
 - [ ] `skills/` directory contains at least one non-stub file
 

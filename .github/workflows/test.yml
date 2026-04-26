@@ -1,0 +1,48 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout agent-kit
+        uses: actions/checkout@v4
+
+      - name: Checkout mcp-task-hub
+        uses: actions/checkout@v4
+        with:
+          repository: mdvacula/mcp-task-hub
+          path: mcp-task-hub
+          token: ${{ secrets.TEMPLATE_REPO_TOKEN }}
+
+      - name: Start hub
+        run: |
+          cp mcp-task-hub/.env.example mcp-task-hub/.env
+          docker compose -f mcp-task-hub/docker-compose.yml up -d --build
+          for i in $(seq 1 20); do
+            curl -sf http://localhost:8000/health && echo " hub ready" && break
+            echo "Waiting for hub... ($i/20)"
+            sleep 3
+          done
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install test dependencies
+        run: pip install pytest
+
+      - name: Run integration tests
+        run: python -m pytest tests/test_hub_integration.py -v
+
+      - name: Show hub logs on failure
+        if: failure()
+        run: docker compose -f mcp-task-hub/docker-compose.yml logs
