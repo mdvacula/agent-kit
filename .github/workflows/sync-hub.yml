@@ -32,7 +32,7 @@ jobs:
         run: |
           cat "${{ github.workspace }}/.agents/skills/mcp-hub-setup/SKILL.md" | \
           pi --provider openrouter \
-             --model anthropic/claude-sonnet-4-6 \
+             --model moonshotai/kimi-k2 \
              --no-session \
              -p "The above is the mcp-hub-setup skill. Execute MODE B exactly as specified.
           Source agent-kit is at: ${{ github.workspace }}

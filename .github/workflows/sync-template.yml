@@ -34,7 +34,7 @@ jobs:
         run: |
           cat "${{ github.workspace }}/.agents/skills/agentic-setup/SKILL.md" | \
           pi --provider openrouter \
-             --model anthropic/claude-sonnet-4-6 \
+             --model moonshotai/kimi-k2 \
              --no-session \
              -p "The above is the agentic-setup skill. Execute MODE B exactly as specified.
           Source agent-kit is at: ${{ github.workspace }}
