@@ -57,13 +57,7 @@ jobs:
             echo "title=chore(template): sync from agent-kit ${{ github.sha }}" >> "$GITHUB_OUTPUT"
           fi
           if [ -f /tmp/pr-body.md ]; then
-            python3 -c "
-import sys, secrets
-body = open('/tmp/pr-body.md').read()
-delim = 'BODY_' + secrets.token_hex(32)
-with open(sys.argv[1], 'a') as f:
-    f.write(f'body<<{delim}\n{body}\n{delim}\n')
-" "$GITHUB_OUTPUT"
+            python3 "${{ github.workspace }}/.github/scripts/write_pr_body.py" "$GITHUB_OUTPUT" /tmp/pr-body.md
           else
             echo "body=Automated sync from agent-kit. Source: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}" >> "$GITHUB_OUTPUT"
           fi
