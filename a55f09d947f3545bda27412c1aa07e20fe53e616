@@ -1,0 +1,7 @@
+{
+  "agent": "opencode",
+  "model": "openrouter/anthropic/claude-sonnet-4.6",
+  "task_id": "agent-kit-integration-tests-ci",
+  "spec_ref": "specs/agent-kit/spec.md",
+  "summary": "Add CI workflow that builds hub via docker compose and runs integration tests against it"
+}
