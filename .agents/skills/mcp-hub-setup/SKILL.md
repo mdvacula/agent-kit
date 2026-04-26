@@ -540,16 +540,13 @@ __all__ = ["mcp", "http_routes", "store", "HOST", "PORT"]
 > `on_event` were all removed in Starlette 1.0. Use the `lifespan` parameter
 > with an `asynccontextmanager` instead.
 >
-> The generated hub must also expose the MCP transport route. If the installed
-> `FastMCP` version provides an ASGI app helper, mount it at `/sse`. If the
-> helper is named differently in that version, use the documented MCP ASGI
-> entrypoint for the installed package, but do not ship a hub that only exposes
-> `/health` and `/tasks`.
+> The generated hub must expose the MCP transport route by mounting the MCP app
+> at `/sse`. Do not ship a hub that only exposes `/health` and `/tasks`.
 
 ```python
 """
 MCP Task Hub entry point.
-Serves HTTP endpoints for health and task reads.
+Serves HTTP endpoints for health and task reads, and mounts the MCP transport.
 
 Uses the Starlette 1.0 lifespan context manager for startup/shutdown hooks.
 (on_startup / on_shutdown / on_event were removed in Starlette 1.0.)
@@ -562,9 +559,9 @@ from typing import AsyncIterator
 
 import uvicorn
 from starlette.applications import Starlette
-from starlette.routing import Route
+from starlette.routing import Mount, Route
 
-from hub import http_routes, store, HOST, PORT
+from hub import http_routes, mcp, store, HOST, PORT
 
 log = logging.getLogger(__name__)
 
@@ -581,13 +578,12 @@ async def lifespan(app: Starlette) -> AsyncIterator[None]:
 
 
 app = Starlette(
-    routes=[Route(r.path, r.endpoint) for r in http_routes],
+    routes=[
+        Mount("/sse", app=mcp.sse_app()),
+        *[Route(r.path, r.endpoint) for r in http_routes],
+    ],
     lifespan=lifespan,
 )
-
-# Ensure the MCP transport is mounted on `/sse` in the generated hub.
-# The exact mount call depends on the installed MCP package version.
-# Do not omit this — OpenCode requires a working SSE transport.
 
 
 if __name__ == "__main__":
