@@ -9,14 +9,24 @@ You (the main session) are the planner. You never implement here. The output is
 a reconciled OpenSpec change plus a queue of well-scoped tasks in the hub,
 ready for `/hub-drain`.
 
+The full agentic loop this sits in:
+`/hub-spec {project, idea}` (workflow: explore → approaches → draft → critique)
+→ **human reviews the artifacts** → `/hub-plan` (this skill: reconcile → chunk
+→ tier → sync) → `/hub-drain` (workflow: implement → review → push) →
+`openspec-verify-change` + `/opsx:archive`.
+
 ## 1. Establish scope
 
 - `project` = the repo's directory name (e.g. `newjerseybrews`).
 - Target change: an existing `openspec/changes/<id>/` or a new one.
-- For a NEW change: create artifacts with the repo's official OpenSpec tooling —
-  the `openspec-propose` / `openspec-new-change` skills or `/opsx:propose|ff`
-  commands (`npx @fission-ai/openspec@latest update` if the repo lacks them).
-  Never hand-write proposal/design/tasks files outside that tooling.
+- For a NEW change: prefer the `/hub-spec` workflow (it explores the codebase,
+  judges competing approaches, drafts artifacts per the repo's OpenSpec schema,
+  and adversarially critiques them). For small/obvious changes the repo's
+  `openspec-propose` / `/opsx:propose|ff` tooling directly is fine
+  (`npx @fission-ai/openspec@latest update` if the repo lacks it). Never
+  hand-write proposal/design/tasks files outside these paths.
+- If `/hub-spec` just ran, read its returned critique — open blockers must be
+  resolved with the user before syncing anything.
 
 ## 2. Reconciliation audit — MANDATORY, before any sync
 
@@ -76,6 +86,12 @@ mcp__task-hub__sync_task(
 
 Never write task-tracking sidecar files into the repo — the hub is the state
 store; `tasks.md` holds only the reconciled checkboxes.
+
+If this session lacks the `mcp__task-hub__*` tools (started before the server
+was registered), delegate the sync to a `hub-steward` agent — "Job D" — passing
+the project name and the full task list as JSON. For big changes you can also
+fan the §2 audit out: one Explore agent per tasks.md section, each classifying
+its items against the codebase, then merge.
 
 ## 6. Report
 

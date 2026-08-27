@@ -27,18 +27,34 @@ claude/
 │   ├── hub-reviewer.md         ← opus, read-only, VERDICT: PASS|FAIL
 │   └── hub-steward.md          ← haiku utility: runLog entries, checkpoint pushes
 ├── skills/
-│   ├── hub-plan/               ← OpenSpec change → reconciliation audit → tiered hub tasks
+│   ├── hub-plan/               ← reconciliation audit → chunk → tier → sync to hub
 │   └── hub-status/             ← queue overview, blocked reasons, stale claims
 ├── workflows/
+│   ├── hub-spec.js             ← agentic spec dev: explore ∥ → 3 approaches → judge → draft → critique → revise
 │   └── hub-drain.js            ← sequential drain: worker → review → fix cycles → push
 └── install.sh                  ← manual copy into ~/.claude (no symlinks, no automation)
 ```
 
-Install: `./claude/install.sh`. Spec authoring always uses the official
-OpenSpec (`opsx`) tooling — `npx @fission-ai/openspec@latest update` per repo.
-The flow: `/hub-plan` → `/hub-drain {project, change}` → `openspec-verify` →
-`/opsx:archive`. Observability is hub-native (`metadata.runLog` per task, plus
-the `/ui` viewer) — the old Entire session capture is not used.
+Install: `./claude/install.sh`. Spec artifacts always follow the official
+OpenSpec (`opsx`) conventions — `npx @fission-ai/openspec@latest update` per
+repo; `/hub-spec` drafts through them agentically.
+
+The end-to-end loop (one human gate, marked ★):
+
+```
+/hub-spec {project, idea}    ← workflow: explore ∥ → competing approaches → judge
+                                → draft artifacts → adversarial critique → revise
+★ review openspec/changes/<id>/  (the only mandatory human step)
+/hub-plan                    ← reconcile tasks.md vs reality → chunk → tier → sync
+/hub-drain {project, change} ← workflow: tiered worker → opus review → fix cycles → push
+openspec-verify + /opsx:archive
+```
+
+Escalations are the second, conditional human touchpoint: `/hub-drain` returns
+early on any blocker (worker blocked, gates unfixable, review failed twice) and
+the main session presents retry/skip/abort options. Observability is hub-native
+(`metadata.runLog` per task, plus the `/ui` viewer) — the old Entire session
+capture is not used.
 
 ## Repo layout
 

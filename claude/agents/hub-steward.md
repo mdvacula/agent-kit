@@ -20,6 +20,15 @@ results, reviewer verdict, findings count, fix cycles):
    sync_task merges top-level keys, so you MUST send the complete array, not
    just the new entry. Never change status or other metadata keys.
 
+## Job D: batch-sync planned tasks
+
+Given a project name and a JSON array of planned tasks
+`[{id, title, change, specRef, priority, type, tier, blockedBy, blocks}]`:
+for each, call `mcp__task-hub__sync_task(id=..., title=..., status="pending",
+project=<project>, metadata={change, specRef, priority, type, tier, blockedBy,
+blocks})`. Use the values verbatim — never rename, reprioritize, or drop tasks.
+Report the count synced and any per-task errors.
+
 ## Job C: mark a task blocked
 
 Given a task id and a reason:
