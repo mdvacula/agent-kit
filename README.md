@@ -2,6 +2,44 @@
 
 Skills, agents, and specs for autonomous coding workflows.
 
+Three tool generations live here side by side — **Claude Code is the current
+one**; the OpenCode and pi assets are retained and still work:
+
+| Generation | Where | Status |
+|---|---|---|
+| **Claude Code** | `claude/` (agents, skills, workflows) | current — see below |
+| OpenCode | `agents/opencode/`, `skills/opencode/`, `commands/opencode/`, `.agents/skills/` | retained |
+| pi | `commands/pi/`, `skills/pi/` | retained |
+
+## Claude Code generation (current)
+
+Planner/orchestrator = the main session (Fable); workers are tiered subagents
+(haiku/sonnet/opus per task), reviews are Opus, and the drain loop is a dynamic
+workflow. Review gates BEFORE push (workers never push — the old pull-rebase
+races are gone).
+
+```
+claude/
+├── agents/
+│   ├── hub-worker.md           ← canonical worker protocol (sonnet default)
+│   ├── hub-worker-haiku.md     ← mechanical-task tier
+│   ├── hub-worker-opus.md      ← hard-task tier
+│   ├── hub-reviewer.md         ← opus, read-only, VERDICT: PASS|FAIL
+│   └── hub-steward.md          ← haiku utility: runLog entries, checkpoint pushes
+├── skills/
+│   ├── hub-plan/               ← OpenSpec change → reconciliation audit → tiered hub tasks
+│   └── hub-status/             ← queue overview, blocked reasons, stale claims
+├── workflows/
+│   └── hub-drain.js            ← sequential drain: worker → review → fix cycles → push
+└── install.sh                  ← manual copy into ~/.claude (no symlinks, no automation)
+```
+
+Install: `./claude/install.sh`. Spec authoring always uses the official
+OpenSpec (`opsx`) tooling — `npx @fission-ai/openspec@latest update` per repo.
+The flow: `/hub-plan` → `/hub-drain {project, change}` → `openspec-verify` →
+`/opsx:archive`. Observability is hub-native (`metadata.runLog` per task, plus
+the `/ui` viewer) — the old Entire session capture is not used.
+
 ## Repo layout
 
 ```
@@ -40,9 +78,9 @@ agent-kit/
 ├── .opencode/                  ← makes agents/skills live in OpenCode when editing agent-kit
 │   └── agents/                 (symlinks → agents/opencode/)
 │
-└── .github/workflows/
-    ├── sync-template.yml       ← push → pi agent → PR on agent-template
-    └── sync-hub.yml            ← push → pi agent → PR on mcp-task-hub
+└── .github/workflows-disabled/ ← DISABLED pi-agent sync actions (see below)
+    ├── sync-template.yml
+    └── sync-hub.yml
 ```
 
 ## Three output repos
@@ -51,21 +89,27 @@ agent-kit/
 |------|-----------|---------------|
 | `agent-template` | Ready-to-clone project scaffold | `git clone github.com/mdvacula/agent-template my-project` |
 | `mcp-task-hub` | Docker service — centralized task state | `git clone github.com/mdvacula/mcp-task-hub ~/mcp-task-hub` |
-| `agent-kit` | This repo — source of truth | Edit here, outputs update via Actions |
+| `agent-kit` | This repo — source of truth | Edit here; the output repos are edited directly too (sync Actions are disabled) |
 
 ## Quick start
 
 ### 1. Start the hub (once, outside any project)
 
 ```bash
-git clone https://github.com/mdvacula/mcp-task-hub ~/mcp-task-hub
-cd ~/mcp-task-hub
+git clone https://github.com/mdvacula/mcp-task-hub ~/infra/task-hub
+cd ~/infra/task-hub
 cp .env.example .env
-docker compose up -d
+docker compose up -d          # binds 127.0.0.1:8050 (compose maps 8050 → container 8000)
 
 # Verify it's healthy
-curl http://localhost:8000/health
+curl http://127.0.0.1:8050/health
 # → {"status":"ok","task_count":0}
+
+# Task viewer UI (shadcn/React, read-only)
+open http://127.0.0.1:8050/ui/
+
+# Register with Claude Code (user-wide, streamable HTTP)
+claude mcp add --scope user --transport http task-hub http://127.0.0.1:8050/mcp
 ```
 
 ### 2. Bootstrap a new project from the template
@@ -171,19 +215,14 @@ stored in the repo itself with zero extra files.
 
 ---
 
-## How the GitHub Actions work
+## GitHub Actions — DISABLED
 
-```
-push to agent-kit/main
-        │
-        ├── changed .agents/skills/mcp-hub-setup/ or specs/mcp-task-hub/
-        │         └── sync-hub.yml → pi agent (Mode B) → PR on mcp-task-hub
-        │
-        └── changed agents/, .agents/skills/agentic-setup/, skills/, or commands/
-                  └── sync-template.yml → pi agent (Mode B) → PR on agent-template
-```
-
-Both actions run independently. Merge the PRs when you've reviewed the diff.
+The pi-agent sync actions (`sync-hub.yml`, `sync-template.yml`) are parked in
+`.github/workflows-disabled/` and do not run. They spawned an unattended coding
+agent on every push and regenerated `mcp-task-hub` / `agent-template` from the
+specs — but both output repos are now edited directly, so a regeneration would
+overwrite real work. If you ever re-enable them, do it deliberately and expect
+them to clobber direct edits.
 
 Required secrets on the `agent-kit` repo:
 
