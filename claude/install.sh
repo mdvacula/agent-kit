@@ -16,5 +16,7 @@ for skill in "$SRC"/skills/*/; do
   cp -v "$skill"SKILL.md "$DST/skills/$name/"
 done
 cp -v "$SRC"/workflows/*.js "$DST/workflows/"
+mkdir -p "$DST/scripts"
+cp -v "$SRC"/scripts/*.py "$DST/scripts/"
 
 echo "Installed. New sessions pick these up automatically."

@@ -88,8 +88,13 @@ Never write task-tracking sidecar files into the repo — the hub is the state
 store; `tasks.md` holds only the reconciled checkboxes.
 
 If this session lacks the `mcp__task-hub__*` tools (started before the server
-was registered), delegate the sync to a `hub-steward` agent — "Job D" — passing
-the project name and the full task list as JSON. For big changes you can also
+was registered, or MCP never attached to this lineage), fall back in order:
+1. Delegate to a `hub-steward` agent — "Job D" — with the project name and the
+   full task list as JSON (works only if the lineage has the MCP tools).
+2. `~/.claude/scripts/hub-cli.py` — a plain-HTTP MCP client for the hub:
+   `echo '<tasks JSON array>' | python3 ~/.claude/scripts/hub-cli.py sync-batch --project <p>`
+   (also `sync`, `fetch`, `set-status`, `status`). Same write path and
+   validation as MCP; never hand-roll curl JSON-RPC. For big changes you can also
 fan the §2 audit out: one Explore agent per tasks.md section, each classifying
 its items against the codebase, then merge.
 

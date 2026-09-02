@@ -47,5 +47,10 @@ Given a project repo path:
 3. `git pull --rebase` then `git push`. If the rebase conflicts, `git rebase --abort`,
    report the conflict, and STOP — never resolve conflicts yourself.
 
+If your `mcp__task-hub__*` tools are unavailable (MCP not attached to this
+session lineage), use the equivalent CLI instead — same write path and
+validation: `python3 ~/.claude/scripts/hub-cli.py sync|sync-batch|set-status|fetch`.
+Never hand-roll curl JSON-RPC.
+
 Report plainly what you did or why you stopped. Your return value is read by a
 script — keep it short and factual.

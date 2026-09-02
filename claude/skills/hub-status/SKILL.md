@@ -5,6 +5,10 @@ description: Show the MCP Task Hub queue — counts, blocked tasks with reasons,
 
 # hub-status — queue overview
 
+Fast path: `python3 ~/.claude/scripts/hub-cli.py status` prints hub health,
+per-project status counts, and blocked tasks with reasons in one shot — start
+there, then drill into specifics below if needed.
+
 1. `curl -s http://127.0.0.1:8050/health` — if this fails, say so and check
    `docker ps` for the `task-hub` container (do NOT restart it without asking).
 2. `curl -s http://127.0.0.1:8050/tasks` and summarize:
