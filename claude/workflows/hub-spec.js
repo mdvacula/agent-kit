@@ -11,11 +11,21 @@ export const meta = {
   ],
 }
 
-const project = args && args.project
-const idea = args && args.idea
-if (!project || !idea) return { error: 'args {project, idea} are required' }
-const repo = (args && args.repo) || `/home/mdv/code/${project}`
-const wantedChangeId = (args && args.changeId) || null
+// tolerate args arriving as stringified JSON / loose object literals
+function normalizeArgs(raw) {
+  if (raw == null || typeof raw === 'object') return raw
+  if (typeof raw !== 'string') return null
+  try { return JSON.parse(raw) } catch {}
+  const keyed = raw.replace(/([{,]\s*)([A-Za-z_]\w*)\s*:/g, '$1"$2":')
+  try { return JSON.parse(keyed) } catch {}
+  try { return JSON.parse(keyed.replace(/'/g, '"')) } catch { return null }
+}
+const A = normalizeArgs(args)
+const project = A && A.project
+const idea = A && A.idea
+if (!project || !idea) return { error: `args {project, idea} are required — received ${typeof args}: ${String(args).slice(0, 120)}` }
+const repo = A.repo || `/home/mdv/code/${project}`
+const wantedChangeId = A.changeId || null
 
 // ── Explore ─────────────────────────────────────────────────────────────────
 phase('Explore')

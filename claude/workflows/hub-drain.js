@@ -12,12 +12,22 @@ export const meta = {
   ],
 }
 
-// ── args ────────────────────────────────────────────────────────────────────
-const project = args && args.project
-if (!project) return { error: 'args.project is required, e.g. {project: "newjerseybrews"}' }
-const repo = (args && args.repo) || `/home/mdv/code/${project}`
-const change = args && args.change
-const maxTasks = (args && args.maxTasks) || 1000
+// ── args (tolerate stringified JSON / loose object literals) ────────────────
+function normalizeArgs(raw) {
+  if (raw == null || typeof raw === 'object') return raw
+  if (typeof raw !== 'string') return null
+  try { return JSON.parse(raw) } catch {}
+  // loose form like {project: "x", maxTasks: 3} — quote bare keys, then retry
+  const keyed = raw.replace(/([{,]\s*)([A-Za-z_]\w*)\s*:/g, '$1"$2":')
+  try { return JSON.parse(keyed) } catch {}
+  try { return JSON.parse(keyed.replace(/'/g, '"')) } catch { return null }
+}
+const A = normalizeArgs(args)
+const project = A && A.project
+if (!project) return { error: `args.project is required, e.g. {project: "newjerseybrews"} — received ${typeof args}: ${String(args).slice(0, 120)}` }
+const repo = A.repo || `/home/mdv/code/${project}`
+const change = A.change
+const maxTasks = A.maxTasks || 1000
 
 const HUB = 'http://127.0.0.1:8050'
 const TIER_AGENT = { haiku: 'hub-worker-haiku', sonnet: 'hub-worker', opus: 'hub-worker-opus' }
