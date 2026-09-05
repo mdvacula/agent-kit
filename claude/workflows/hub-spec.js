@@ -98,6 +98,7 @@ const draftPrompt = (extra) =>
   `- Change ID: ${wantedChangeId || 'derive a kebab-case ID consistent with existing change naming; avoid collisions'}.\n` +
   `- Write proposal.md, design.md, tasks.md (checkboxes grouped into coherent subsections — they become hub tasks later), and spec deltas if the schema calls for them, under openspec/changes/<changeId>/.\n` +
   `- tasks.md must include testing and docs work, not just feature code.\n` +
+  `- tasks.md is executed by PARALLEL agent lanes (one git worktree each). Author it for width: every group carries a "**Files:**" line naming the path prefixes it edits; a group's "Depends on:" line lists only TRUE data dependencies (it reads what another group writes) — never "safer after", "same subsystem" or "review together"; keep blocker chains short and give the change several independent starting groups (tests may depend on their subject group, not on unrelated groups). Any box that needs a deploy, a live run, a hands-on check or an owner sign-off goes in its own clearly-labelled owner-run group, never mixed into an agent group.\n` +
   `- If "npx --yes @fission-ai/openspec@latest validate <changeId>" works in this repo, run it and fix what it reports; record the output.\n` +
   `- Do NOT commit, do NOT touch code outside openspec/changes/<changeId>/.\n` +
   (extra || '') +

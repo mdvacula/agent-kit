@@ -19,13 +19,30 @@ repo path, and possibly review findings to fix.
 4. **Read context before writing code**: the repo's `CLAUDE.md` and `AGENTS.md`,
    the task's `metadata.specRef` (a path into the OpenSpec artifacts — read that
    section), and the neighboring code you'll touch. Match existing patterns,
-   naming, and comment density.
+   naming, and comment density. **Read narrowly.** tasks.md and design.md in
+   this repo run 500–1,400 lines; do NOT read them whole. Read: the specRef
+   section (its `**Spec:**`/`**Design:**` header lines name exactly which spec
+   requirements and design decisions apply — read those by anchor), the
+   proposal's Why and What Changes, and the change's intro/ordering notes.
+   Budget roughly ten read calls before the first edit; measured 2026-09-02,
+   workers averaged 45 read-type calls and spent a third of their time
+   re-reading artifacts that their section already summarized.
 5. **Implement** the task minimally and completely. No scope creep: if you notice
    adjacent problems, mention them in your report instead of fixing them.
 6. **Quality gates**: detect and run the repo's checks (for pnpm repos typically
    `pnpm lint`, `pnpm type-check`, `pnpm test`; otherwise whatever CLAUDE.md
    names). All gates must pass before you commit. If a gate fails, fix it; if you
-   cannot, go to the Blocked path.
+   cannot, go to the Blocked path. **If your diff touches `frontend/` or any
+   file the frontend imports (e.g. `packages/shared/`), the production build is
+   a gate too: run `npx next build` in `frontend/` (3–4 min) — type-check and
+   vitest do not exercise Turbopack's module resolution, and a broken build
+   blocks every deploy (2026-09-03: a `.js` specifier in packages/shared passed
+   every other gate and broke `next build` on main for a day).**
+   Gates are tests, type-checks, lints, and
+   read-only scripts — **a deploy is never a gate** (see Hard rules). If a
+   task's checkbox says "run it against real data" or "verify in deployment",
+   finish the code half, commit, and take the Blocked path naming the run as
+   owner-executed.
 7. **Zero-bloat check**: stage your changes, then inspect
    `git diff --cached --name-only`. If it lists any `.jsonl`, `.sqlite`, `.db`,
    lockfiles you didn't intend to change, or task-tracking sidecar files — unstage
@@ -60,4 +77,12 @@ then report the blocker and stop. A precise blocker report is a successful run.
 - One task only — never start another task, even if the queue is visible to you.
 - Never push, pull, rebase, or touch branches.
 - Never modify another project's services, containers, or files outside the repo.
+- **Never deploy or touch live state.** No `npx convex deploy`, `convex run`
+  against a deployment, `ship.sh`, `docker compose up/restart/build`, systemd,
+  env-file edits, or writes to any live database — even to "make the sweep
+  actually run" or "verify on real data". Those backends serve real users
+  (beta.thebeatpath.com is one). A task that needs a deploy or a live run ends
+  on the Blocked path with the exact commands the owner should run.
+  (Added 2026-09-02 after a worker deployed Convex functions to the live
+  backend mid-drain.)
 - Never commit secrets, .env files, or generated artifacts.

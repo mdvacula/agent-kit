@@ -52,6 +52,39 @@ syncing. This step regularly rewrites half the plan — do not skip it.
   only the task + specRef, so the title and spec section must carry the intent.
 - Model dependencies with `blockedBy`/`blocks` (task IDs), not ordering hopes.
 
+### Plan for parallel lanes (added 2026-09-03)
+
+`/hub-drain` runs several lanes at once, each in its own git worktree. A lane
+takes the next runnable task whose files do not collide with what other lanes
+are working on. The plan decides how much of that width is usable:
+
+- **`blockedBy` is a data dependency, nothing else.** Add an edge only when a
+  task reads code, schema, or an artifact that another task writes. "Safer to
+  do after", "same subsystem", "review them together" are NOT edges — they
+  serialize a lane for no reason. If the spec's ordering notes say two groups
+  "must land together", ask whether that is true at the file level; usually
+  one direction of dependency is real and the other is habit.
+- **Declare `touches`** on every task: the top-level paths it will edit, as
+  path prefixes (`["worker/src/workflows/rssIngest.ts", "convex/schema.ts",
+  "frontend/src/components/coverage/"]`). The drain uses it as the collision
+  lock: two tasks with disjoint `touches` may run concurrently even inside
+  one change; a task without `touches` falls back to a change-wide lock.
+  Derive it from the spec section's **Files:** line and the design; be
+  generous with prefixes rather than precise and wrong.
+- **Chunk for width.** With N lanes, a change whose tasks form one long chain
+  keeps one lane busy and N−1 idle. Aim for at least N independent roots per
+  change (tasks with no `blockedBy`), and keep each blocker chain short.
+  Merge sequential steps that share files into one task; split steps that
+  touch disjoint files into separate tasks even when they are small.
+- **Owner-gated work is its own task.** Any box that needs a deploy, a run
+  against a live backend or database, a hands-on check, or a sign-off becomes
+  a separate task titled `OWNER OPS:` or `OWNER DECISION:` with status
+  `blocked`, the exact commands or the proposed default in `notes`, blocking
+  only what truly depends on it. Never fold such a box into an agent task —
+  workers may not deploy or touch live state and will stop on it.
+- **External gates** (a box that waits on another change) also sync as
+  `blocked` with the gate named in `notes`, never as runnable `pending`.
+
 ## 4. Assign priority and tier
 
 Priority: P0 = setup/scaffolding others depend on; P1 = core features AND
@@ -81,6 +114,9 @@ mcp__task-hub__sync_task(
     priority: "P0|P1|P2", type: "task|feature|chore",
     tier: "haiku|sonnet|opus",
     blockedBy: [...], blocks: [...],
+    touches: ["<path prefix>", ...],   # collision lock for parallel lanes
+    boxes: "3.1-3.6",                  # which tasks.md checkboxes this covers
+    notes: "...",                      # owner commands / proposed default / gate
   })
 ```
 

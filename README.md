@@ -21,21 +21,32 @@ races are gone).
 ```
 claude/
 ├── agents/
-│   ├── hub-worker.md           ← canonical worker protocol (sonnet default)
+│   ├── hub-worker.md           ← canonical worker protocol (sonnet default); never deploys
 │   ├── hub-worker-haiku.md     ← mechanical-task tier
 │   ├── hub-worker-opus.md      ← hard-task tier
 │   ├── hub-reviewer.md         ← opus, read-only, VERDICT: PASS|FAIL
-│   └── hub-steward.md          ← haiku utility: runLog entries, checkpoint pushes
+│   └── hub-steward.md          ← haiku utility: runLog entries, lane git ops
 ├── skills/
-│   ├── hub-plan/               ← reconciliation audit → chunk → tier → sync to hub
+│   ├── hub-plan/               ← reconciliation audit → chunk → tier → touches → sync to hub
 │   └── hub-status/             ← queue overview, blocked reasons, stale claims
 ├── workflows/
 │   ├── hub-spec.js             ← agentic spec dev: explore ∥ → 3 approaches → judge → draft → critique → revise
-│   └── hub-drain.js            ← sequential drain: worker → review → fix cycles → push
-└── install.sh                  ← manual copy into ~/.claude (no symlinks, no automation)
+│   ├── hub-drain.js            ← parallel-lane drain: worker → review → fix cycles → rebase+ff-merge+push
+│   ├── hub-queue.py            ← computes a lane's runnable task set (deps + touches collision lock)
+│   ├── hub-lane-setup.sh       ← (re)create + reset a lane worktree, install deps, copy ignored inputs
+│   ├── hub-lane-merge.sh       ← land a reviewed lane: rebase onto main, ff-merge, push
+│   └── hub-lane-park.sh        ← keep unmerged lane commits on parked/<task>-<ts>, reset lane
+├── scripts/
+│   └── hub-cli.py              ← plain-HTTP hub client for sessions started without the MCP
+├── memory/                     ← backup of the Claude Code auto-memory for this system (see README there)
+├── plans/                      ← the plan-mode file the build started from
+├── install.sh                  ← manual copy into ~/.claude (no symlinks, no automation)
+└── install-memory.sh           ← restore memory/ into a project's ~/.claude/projects/<dir>/memory
 ```
 
-Install: `./claude/install.sh`. Spec artifacts always follow the official
+Install: `./claude/install.sh`; restore the auto-memory for a project with
+`./claude/install-memory.sh ~/code` (Claude Code keys memory by the session's
+start directory, so it must be installed where sessions begin). Spec artifacts always follow the official
 OpenSpec (`opsx`) conventions — `npx @fission-ai/openspec@latest update` per
 repo; `/hub-spec` drafts through them agentically.
 
@@ -46,7 +57,7 @@ The end-to-end loop (one human gate, marked ★):
                                 → draft artifacts → adversarial critique → revise
 ★ review openspec/changes/<id>/  (the only mandatory human step)
 /hub-plan                    ← reconcile tasks.md vs reality → chunk → tier → sync
-/hub-drain {project, change} ← workflow: tiered worker → opus review → fix cycles → push
+/hub-drain {project, change} ← workflow: N lanes ∥ tiered worker → opus review → fix cycles → land
 openspec-verify + /opsx:archive
 ```
 
@@ -169,20 +180,35 @@ todo — stale plans get corrected, not executed), then chunks the real work int
 per task, wires `blockedBy` dependencies, and syncs to the hub with
 `project` set. You see the audit before anything is synced.
 
-**4. `/hub-drain` — execute** *(workflow, sequential)*
+**4. `/hub-drain` — execute** *(workflow, parallel lanes)*
 
 ```
 /hub-drain {project: "newjerseybrews", change: "<id>", maxTasks: 3}   # babysat first batch
-/hub-drain {project: "newjerseybrews", change: "<id>"}                # then the rest
+/hub-drain {project: "newjerseybrews", change: "<id>", lanes: 4}      # then the rest
 ```
 
-Per task: a worker at the task's tier claims it, reads the specRef + repo
-guardrails, implements, runs the gates, commits locally (**workers never
-push**). An Opus reviewer inspects the commit range against the spec and
-re-runs gates; on FAIL the findings go to a fresh worker for a fix cycle (max
-2, second one bumps the tier). After PASS, a steward records the `runLog` and
-pushes at checkpoints (every ~3 tasks). Watch live via `/workflows` or the hub
-UI.
+The drain runs `lanes` (default 3, max 6) git worktrees at `<repo>-lanes/lane-N`,
+each on its own `lane-N` branch reset to `main` (`hub-lane-setup.sh` also
+installs deps and copies the gitignored inputs the gates need). `hub-queue.py`
+computes each lane's runnable set from the hub — `blockedBy` satisfied and
+`metadata.touches` disjoint from what other lanes hold; a task without
+`touches` takes a change-wide lock. `laneOffset` lets two drains for different
+projects share the box.
+
+Per task: a worker at the task's tier claims it, reads the specRef section
+narrowly, implements, runs the gates (**a deploy is never a gate**), commits
+locally — **workers never push**. An Opus reviewer inspects the commit range
+against the spec and re-runs gates; on FAIL the findings go to a fresh worker
+for a fix cycle (max 2, second one bumps the tier). After PASS a steward records
+the `runLog` and lands the lane with `hub-lane-merge.sh` (rebase onto main,
+ff-merge, push — serialised across lanes). A task that fails twice, or blocks
+with code we chose not to land, is parked on `parked/<task>-<timestamp>` and
+the lane resets. Owner-gated stops (`OWNER OPS:` / `OWNER DECISION:` boxes)
+are recorded as `blocked` and skipped — they never end the run. Watch live via
+`/workflows` or the hub UI.
+
+Pass workflow args as a real JSON object; both workflows tolerate stringified
+args through `normalizeArgs()` because the tool has delivered them as strings.
 
 **5. Close the change**: `openspec-verify-change` to validate implementation
 against the artifacts, then `/opsx:archive`.
@@ -190,8 +216,9 @@ against the artifacts, then `/opsx:archive`.
 ### When something blocks
 
 `/hub-drain` never pushes through a failure — it marks the task `blocked`
-(with a required reason, visible in the UI and `/hub-status`) and **returns
-early**; the main session then offers retry / skip / abort / investigate.
+(with a required reason, visible in the UI and `/hub-status`), parks any lane
+commits, and keeps draining the other lanes; blockers are summarised at the
+end for the main session to offer retry / skip / investigate.
 Relaunching the drain is idempotent: completed tasks aren't refetched.
 `/hub-status` also flags stale claims (`in-progress` >2 h — usually a dead
 run; reset to `pending` after confirming).
