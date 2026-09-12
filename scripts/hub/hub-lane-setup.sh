@@ -20,7 +20,8 @@ if [ -d "$WT/.git" ] || [ -f "$WT/.git" ]; then
   # drop stray tracked-file edits/untracked source from a dead worker, but keep
   # the ignored scaffolding we copy below and node_modules
   git -C "$WT" clean -fdq -e node_modules -e convex/_generated -e '.env.local' \
-    -e 'frontend/.env.local' -e 'worker/.env.local' -e 'frontend/next-env.d.ts'
+    -e 'frontend/.env.local' -e 'worker/.env.local' -e 'frontend/next-env.d.ts' \
+    -e graft -e .ignore
 else
   git -C "$REPO" worktree add -q -B "$BR" "$WT" main
 fi
@@ -61,6 +62,18 @@ if [ ! -d node_modules ] || [ "$(cat "$STAMP" 2>/dev/null || true)" != "$LOCK_HA
   pnpm install --frozen-lockfile --prefer-offline --silent >/dev/null 2>&1 \
     || pnpm install --frozen-lockfile --silent >/dev/null
   echo "$LOCK_HASH" > "$STAMP"
+fi
+
+# Graft code graph (opt-in per repo: the repo has been `graft init`-ed and the
+# CLI is installed via scripts/hub/graft-install.sh). graft/ is a gitignored
+# local cache, so each lane needs its own; seed it from the main checkout so a
+# deep (LLM) layer built there is not re-paid per lane, then run the $0
+# structural refresh for THIS worktree. Non-fatal: workers fall back to grep.
+if [ -f "$WT/.claude/skills/graft/SKILL.md" ] && command -v graft >/dev/null 2>&1; then
+  if [ -d "$REPO/graft" ] && [ ! -d "$WT/graft" ]; then
+    rsync -a "$REPO/graft/" "$WT/graft/"
+  fi
+  (DO_NOT_TRACK=1 timeout 300 graft build "$WT" >/dev/null 2>&1) || echo "graft build skipped (non-fatal)" >&2
 fi
 
 echo "READY $WT $(git rev-parse --short HEAD)"

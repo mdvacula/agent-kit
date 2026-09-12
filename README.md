@@ -311,6 +311,30 @@ validated: `opencode agent list`, `opencode debug agent hub-drain`,
 
 ---
 
+## Graft (code graph) — pilot
+
+[Graft](https://github.com/trailhq/Graft) (MIT) gives workers a tree-sitter
+call graph instead of grep-and-read exploration: `graft ask`, `skeleton`,
+`callers`, `map`, plus six MCP tools. It is opt-in per repo and both
+generations use the CLI in the lane worktree (refresh-first, sees the lane's
+own edits; the project `.mcp.json`/`opencode.json` server only sees the main
+checkout).
+
+```bash
+scripts/hub/graft-install.sh            # pinned npm install + patch out the "report your savings" nudge
+cd ~/code/<repo>
+graft init --no-global --no-statusline --agents claude agents   # repo-scoped wiring only
+# then trim .claude/settings.json: drop the tool-savings PostToolUse hook and the Stop hook
+# (metrics only), keep post-edit / session-start / prompt; commit .claude, .mcp.json,
+# opencode.json, AGENTS.md, .gitignore, .ignore.   graft/ itself stays gitignored.
+```
+
+`hub-lane-setup.sh` seeds each lane's `graft/` from the main checkout and runs
+the $0 structural build when the repo is indexed; the worker protocol and the
+reviewer use it (blast radius via `graft callers`). Pilot repo:
+newjerseybrews (2026-09-12). Measure read-call counts per worker against the
+2026-09-02 baseline (~45) before rolling out further.
+
 ## Legacy: OpenCode v1 & pi generations
 
 Retained but not the current path. The OpenCode v1 agents (`hub-runner`,

@@ -19,6 +19,10 @@ Bash is for inspection and read-only gate runs only.
 2. Read the spec section at `specRef` plus the change's `proposal.md`/`tasks.md`
    if present, and the repo's `CLAUDE.md`/`AGENTS.md` guardrails.
 3. Inspect the work: `git log --stat <range>` and `git diff <range>`.
+   If the repo is graft-indexed (`.claude/skills/graft/SKILL.md` exists and
+   `command -v graft` works), run `graft callers <symbol>` in the worktree
+   for every function or type whose signature or behaviour the diff changes —
+   that is the blast radius; callers the diff did not update are findings.
 4. Check, in order of severity:
    - **Conformance**: does the diff actually implement the task as specified?
      Missing acceptance criteria are blockers.

@@ -23,6 +23,13 @@ path your prompt names (a lane worktree). Follow every step in order.
    read those by anchor), the proposal's Why and What Changes, and the
    change's intro/ordering notes. Budget roughly ten read calls before the
    first edit.
+   **If the repo is graft-indexed** (`.claude/skills/graft/SKILL.md` exists
+   and `command -v graft` works), orient through the graph before opening
+   source: `graft ask "<task title or the symbols the spec names>" --source`
+   for the relevant spans, `graft skeleton <file>` instead of reading a file
+   for its API, `graft callers <symbol>` before changing a signature. Run
+   these in YOUR worktree (they refresh for free and see your edits). They
+   replace exploration reads, not the specRef read.
 5. **Implement** the task minimally and completely. No scope creep: if you
    notice adjacent problems, mention them in your report instead of fixing
    them.
