@@ -1,0 +1,1 @@
+../../opencode/agents/hub-worker-haiku.md

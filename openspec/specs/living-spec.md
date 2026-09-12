@@ -10,7 +10,7 @@
 
 ### MCP Task Hub
 
-- [x] Hub exposes SSE transport at `http://localhost:8000/sse`
+- [x] Hub exposes streamable HTTP MCP at `http://127.0.0.1:8050/mcp` (SSE removed in v2)
 - [x] Hub exposes `/health`, `/tasks`, `/tasks/{id}` HTTP endpoints
 - [x] `sync_task`, `fetch_tasks`, `update_task_status` MCP tools work
 - [x] `specs/mcp-task-hub/spec.md` contains canonical implementation templates
@@ -24,20 +24,20 @@
 - [x] `.agents/skills/mcp-hub-setup/SKILL.md` references spec — no duplicated code
 - [x] `specs/agent-kit/spec.md` documents this repo
 - [x] `openspec/config.yaml` and `openspec/specs/living-spec.md` exist
-- [x] `opencode.json` has correct MCP task-hub config with `type: "sse"`
+- [x] `opencode.json` has correct MCP task-hub config with `type: "remote"`
 - [ ] `sync-hub.yml` verifies `/sse` endpoint is live after container starts in CI
 
 ### OpenCode Integration
 
-- [x] `opencode.json` connects to hub at `http://localhost:8000/sse`
+- [x] `opencode.json` connects to hub at `http://127.0.0.1:8050/mcp`
 - [ ] `/status` command works in all downstream projects
 - [ ] `agentic-setup` skill produces valid `opencode.json` on first run
 
 ### Agent Workflow
 
-- [x] `hub-runner` agent executes single tasks end-to-end
-- [x] `hub-orchestrator` agent coordinates parallel task execution
-- [x] `openspec-orchestrator` agent parses living spec and syncs tasks
+- [x] `hub-worker` (+haiku/opus tiers) executes one task per lane worktree; `hub-reviewer` gates the push
+- [x] `hub-drain` primary agent runs the parallel-lane drain (worker → review → fix cycles → land)
+- [x] `hub-spec` primary agent + `/hub-plan` skill produce and sync OpenSpec changes
 - [ ] Git notes are attached after every task commit (`refs/notes/agent-log`)
 
 ---

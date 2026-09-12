@@ -1,1 +1,0 @@
-../../../agents/opencode/openspec-orchestrator.md

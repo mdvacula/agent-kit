@@ -11,7 +11,7 @@ description: >
 # MCP Task Hub Setup
 
 The MCP Task Hub is a standalone Docker service. It runs once on your machine
-and serves all your projects simultaneously. Agents connect to it over SSE.
+and serves all your projects simultaneously. Agents connect to it over streamable HTTP at /mcp (the SSE transport was removed in v2).
 
 | Mode | Trigger | What it does |
 |------|---------|--------------|
@@ -60,7 +60,7 @@ cd ~/mcp-task-hub
 cp .env.example .env
 ```
 
-Edit `.env` if you need to change the port (default 8000) or log level.
+Edit `.env` if you need to change the container port (default 8000; the host binds 127.0.0.1:8050) or log level.
 Do not change `HUB_DB_PATH` — it is managed by Docker volumes.
 
 ```
@@ -79,21 +79,21 @@ cd ~/mcp-task-hub
 docker compose up -d
 ```
 
-Expected: container `mcp-task-hub` starts, port 8000 is bound.
+Expected: container `task-hub` starts, host port 127.0.0.1:8050 is bound.
 
 ---
 
 ## A5 — Verify
 
 ```bash
-curl http://localhost:8000/health
+curl http://127.0.0.1:8050/health
 # → {"status":"ok","task_count":0}
 
-curl --max-time 3 http://localhost:8000/sse
+curl -s http://127.0.0.1:8050/health   # /mcp only answers JSON-RPC POSTs
 # → HTTP 200, content-type: text/event-stream
 
 docker compose ps
-# → mcp-task-hub   running   0.0.0.0:8000->8000/tcp
+# → mcp-task-hub   running   127.0.0.1:8050->8000/tcp
 ```
 
 ---
@@ -107,8 +107,8 @@ For OpenCode, add to `opencode.json` in the project root:
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
     "task-hub": {
-      "type": "sse",
-      "url": "http://localhost:8000/sse",
+      "type": "remote",
+      "url": "http://127.0.0.1:8050/mcp",
       "enabled": true
     }
   }
@@ -121,8 +121,8 @@ For Cursor, add to `.cursor/mcp.json`:
 {
   "mcpServers": {
     "task-hub": {
-      "url": "http://localhost:8000/sse",
-      "transport": "sse"
+      "url": "http://127.0.0.1:8050/mcp",
+      "transport": "http"
     }
   }
 }
@@ -213,9 +213,9 @@ python -m pytest
 docker compose build
 docker compose up -d
 sleep 3
-curl http://localhost:8000/health
-curl --max-time 3 http://localhost:8000/sse
-curl http://localhost:8000/tasks
+curl http://127.0.0.1:8050/health
+curl -s http://127.0.0.1:8050/health   # /mcp only answers JSON-RPC POSTs
+curl http://127.0.0.1:8050/tasks
 docker compose down
 ```
 

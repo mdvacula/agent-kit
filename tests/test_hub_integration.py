@@ -1,12 +1,12 @@
 """
 Integration tests for the MCP Task Hub.
 
-These tests hit the live hub at http://localhost:8000 via plain HTTP.
+These tests hit the live hub (HUB_URL, default http://127.0.0.1:8050) via plain HTTP.
 They verify the hub contract as a consumer — independent of the hub's
 internal implementation.
 
 Requirements:
-    Hub must be running: docker compose -f ~/mcp-task-hub/docker-compose.yml up -d
+    Hub must be running: docker compose -f ~/infra/task-hub/docker-compose.yml up -d
 
 Run:
     python -m pytest tests/test_hub_integration.py -v
@@ -18,6 +18,7 @@ Skip gracefully when the hub is not running:
 from __future__ import annotations
 
 import json
+import os
 import time
 import urllib.error
 import urllib.request
@@ -26,7 +27,7 @@ from typing import Any
 
 import pytest
 
-HUB_BASE = "http://localhost:8000"
+HUB_BASE = os.environ.get("HUB_URL", "http://127.0.0.1:8050")
 
 
 def _hub_available() -> bool:
@@ -39,7 +40,7 @@ def _hub_available() -> bool:
 
 hub_required = pytest.mark.skipif(
     not _hub_available(),
-    reason="Hub not running — start with: docker compose -f ~/mcp-task-hub/docker-compose.yml up -d",
+    reason="Hub not running — start with: docker compose -f ~/infra/task-hub/docker-compose.yml up -d",
 )
 
 

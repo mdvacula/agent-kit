@@ -175,7 +175,7 @@ git -C "$TARGET_DIR" init
 | `PROJECT_NAME` | Short slug for task ID prefixes | Basename of `TARGET_DIR` |
 | `TECH_STACK` | Primary stack (for OpenSpec context) | Infer from `package.json`, `go.mod`, `Cargo.toml`, etc. — ask only if none found |
 
-The hub URL is always `http://localhost:8000/sse` (Docker default).
+The hub URL is always `http://127.0.0.1:8050/mcp` (Docker default).
 
 If the user says "run the skill" or "start now", use the best available defaults
 and only pause for input if a required value still cannot be inferred.
@@ -217,7 +217,7 @@ schema: spec-driven
 context: |
   Project: PROJECT_NAME
   Tech stack: TECH_STACK
-  Task hub: http://localhost:8000/sse (Docker — cd ~/mcp-task-hub && docker compose up -d)
+  Task hub: http://127.0.0.1:8050/mcp (Docker — cd ~/infra/task-hub && docker compose up -d)
   Zero-bloat rule: task state in hub, observability in git notes (refs/notes/agent-log).
 ```
 
@@ -284,7 +284,7 @@ once and leave it running.
 if [ -d ~/mcp-task-hub ]; then
   docker compose -f ~/mcp-task-hub/docker-compose.yml up -d
   sleep 2
-  curl -sf http://localhost:8000/health && echo "✓ Hub running" || echo "⚠ Hub failed to start"
+  curl -sf http://127.0.0.1:8050/health && echo "✓ Hub running" || echo "⚠ Hub failed to start"
 else
   echo "Hub not installed — see skills/mcp-hub-setup/SKILL.md (Mode A)"
 fi
@@ -300,8 +300,8 @@ If the hub directory does not exist, stop and tell the user to run
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
     "task-hub": {
-      "type": "sse",
-      "url": "http://localhost:8000/sse",
+      "type": "remote",
+      "url": "http://127.0.0.1:8050/mcp",
       "enabled": true
     }
   }
@@ -338,9 +338,7 @@ AK="$AGENT_KIT_DIR"
 T="$TARGET_DIR"
 
 mkdir -p "$T/.opencode/agents"
-cp "$AK/agents/opencode/hub-runner.md"            "$T/.opencode/agents/hub-runner.md"
-cp "$AK/agents/opencode/hub-orchestrator.md"      "$T/.opencode/agents/hub-orchestrator.md"
-cp "$AK/agents/opencode/openspec-orchestrator.md" "$T/.opencode/agents/openspec-orchestrator.md"
+for a in hub-worker hub-worker-haiku hub-worker-opus hub-reviewer hub-steward hub-drain hub-spec; do cp "$AK/opencode/agents/$a.md" "$T/.opencode/agents/$a.md"; done
 ```
 
 **Skills** (tool-specific, from `skills/`):
@@ -395,7 +393,7 @@ Never commit JSONL, SQLite, or task markdown sidecars.
 | Tool | Role | Notes |
 |------|------|-------|
 | **Git Notes** | Agent observability | `refs/notes/agent-log` — attached to every task commit |
-| **MCP Task Hub** | Task execution state | `sync_task` · `fetch_tasks` · `update_task_status` · `http://localhost:8000/sse` |
+| **MCP Task Hub** | Task execution state | `sync_task` · `fetch_tasks` · `update_task_status` · `http://127.0.0.1:8050/mcp` |
 | **OpenSpec** | Living Spec + change workflow | `openspec/specs/living-spec.md` is source of truth |
 | **OpenCode** | Primary coding agent | `.opencode/` — agents, skills, commands |
 | **pi** | Orchestration / CI agent | `.pi/` — agents, skills, prompts |
@@ -470,9 +468,12 @@ git status   # MUST show "up to date with origin"
 
 | Agent | Purpose |
 |-------|---------|
-| `hub-runner` | Execute one task end-to-end |
-| `hub-orchestrator` | Coordinate parallel hub-runner subagents |
-| `openspec-orchestrator` | Plan: idea → spec → tasks synced to hub |
+| `hub-worker` (+`-haiku`, `-opus` tiers) | Execute one hub task in a lane worktree; commit locally, never push |
+| `hub-reviewer` | Opus, read-only review of a task's commits — VERDICT PASS/FAIL |
+| `hub-steward` | Haiku utility: runLog entries, batch sync, land/park lanes |
+| `hub-drain` (primary) | Parallel-lane drain: worker → review → fix cycles → land |
+| `hub-spec` (primary) | Idea → explored, judged, critiqued OpenSpec artifacts (no sync) |
+| `/hub-plan`, `/hub-status` (commands + skills) | Reconcile → chunk → tier → sync; queue overview |
 ```
 
 ---
@@ -513,7 +514,7 @@ T="$TARGET_DIR"
 openspec --version && echo "✓ OpenSpec"
 
 # Hub reachable
-curl -sf http://localhost:8000/health && echo "✓ Hub" || echo "⚠ Hub not responding — run: cd ~/mcp-task-hub && docker compose up -d"
+curl -sf http://127.0.0.1:8050/health && echo "✓ Hub" || echo "⚠ Hub not responding — run: cd ~/infra/task-hub && docker compose up -d"
 
 # Git notes refspec (only meaningful if a remote exists)
 if git -C "$T" remote get-url origin &>/dev/null; then
@@ -562,7 +563,7 @@ git -C "$T" commit -m "chore: bootstrap agentic infrastructure
 - Git Notes observability (refs/notes/agent-log)
 - MCP Task Hub config in opencode.json
 - OpenSpec living spec scaffold (opencode + pi)
-- Agents: hub-runner, hub-orchestrator, openspec-orchestrator
+- Agents: hub-worker(-haiku/-opus), hub-reviewer, hub-steward, hub-drain, hub-spec (+ /hub-plan, /hub-status, /hub-spec, /hub-drain commands)
 - AGENTS.md workflow reference
 - Zero-bloat gitignore rules"
 
@@ -634,10 +635,10 @@ Write the full contents from Mode A Step A7. This is the same every time.
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
     "task-hub": {
-      "type": "sse",
-      "url": "http://localhost:8000/sse",
+      "type": "remote",
+      "url": "http://127.0.0.1:8050/mcp",
       "enabled": true,
-      "_comment": "Hub runs via Docker. Start with: cd ~/mcp-task-hub && docker compose up -d. Change port if you edited HUB_PORT in .env."
+      "_comment": "Hub runs via Docker. Start with: cd ~/infra/task-hub && docker compose up -d. Change port if you edited HUB_PORT in .env."
     }
   }
 }
@@ -651,7 +652,7 @@ schema: spec-driven
 context: |
   Project: PROJECT_NAME
   Tech stack: TECH_STACK
-  Task hub: http://localhost:8000/sse (Docker — cd ~/mcp-task-hub && docker compose up -d)
+  Task hub: http://127.0.0.1:8050/mcp (Docker — cd ~/infra/task-hub && docker compose up -d)
   Zero-bloat rule: task state in hub, observability in git notes (refs/notes/agent-log).
 
 # Uncomment and fill in after cloning:
@@ -706,7 +707,7 @@ Ready-to-clone scaffold for agentic projects using **OpenCode** and **pi**.
 |------|---------|
 | `AGENTS.md` | Workflow reference for all agents |
 | `opencode.json` | OpenCode config — MCP Task Hub endpoint |
-| `.opencode/agents/` | hub-runner, hub-orchestrator, openspec-orchestrator |
+| `.opencode/agents/` | hub-worker(-haiku/-opus), hub-reviewer, hub-steward, hub-drain, hub-spec |
 | `.opencode/skills/` | OpenSpec skills |
 | `.opencode/commands/` | OpenSpec slash commands (`/opsx-*`) |
 | `.pi/skills/` | OpenSpec skills |
@@ -738,9 +739,9 @@ Generated from [agent-kit](https://github.com/mdvacula/agent-kit) by the agentic
 OpenCode agents (pi has no agent concept):
 
 ```
-agent-kit/agents/opencode/hub-runner.md            → .opencode/agents/hub-runner.md
-agent-kit/agents/opencode/hub-orchestrator.md      → .opencode/agents/hub-orchestrator.md
-agent-kit/agents/opencode/openspec-orchestrator.md → .opencode/agents/openspec-orchestrator.md
+agent-kit/opencode/agents/*.md                     → .opencode/agents/ (7 hub agents)
+agent-kit/opencode/commands/*.md                   → .opencode/commands/
+agent-kit/opencode/skills/*/SKILL.md               → .opencode/skills/
 ```
 
 Commands and prompt templates:
@@ -766,9 +767,9 @@ AGENTS.md
 README.md
 .gitignore
 opencode.json
-.opencode/agents/hub-runner.md
-.opencode/agents/hub-orchestrator.md
-.opencode/agents/openspec-orchestrator.md
+.opencode/agents/hub-worker.md  (+ -haiku, -opus, hub-reviewer, hub-steward, hub-drain, hub-spec)
+.opencode/commands/hub-{spec,plan,status,drain}.md
+.opencode/skills/{hub-worker-protocol,hub-plan,hub-status}/SKILL.md
 .opencode/commands/opsx-propose.md
 .pi/prompts/opsx-propose.md
 .pi/prompts/hub-run.md

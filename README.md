@@ -2,13 +2,16 @@
 
 Skills, agents, and specs for autonomous coding workflows.
 
-Three tool generations live here side by side — **Claude Code is the current
-one**; the OpenCode and pi assets are retained and still work:
+Three tools are supported side by side. **Claude Code and OpenCode are the
+current generation** and share one design (same hub, same agent roles, same
+lane scripts); the pi assets are retained and still work:
 
 | Generation | Where | Status |
 |---|---|---|
-| **Claude Code** | `claude/` (agents, skills, workflows) | current — see below |
-| OpenCode | `agents/opencode/`, `skills/opencode/`, `commands/opencode/`, `.agents/skills/` | retained |
+| **Claude Code** | `claude/` (agents, skills, workflows, memory) | current — see below |
+| **OpenCode** | `opencode/` (agents, commands, skills, opencode.json) | current — mirrors `claude/` |
+| shared | `scripts/hub/` (lane worktrees, queue, plain-HTTP hub client) | used by both |
+| OpenCode v1 | `agents/opencode/legacy-v1/`, `.agents/skills/` | retained, not installed |
 | pi | `commands/pi/`, `skills/pi/` | retained |
 
 ## Claude Code generation (current)
@@ -43,6 +46,10 @@ claude/
 ├── install.sh                  ← manual copy into ~/.claude (no symlinks, no automation)
 └── install-memory.sh           ← restore memory/ into a project's ~/.claude/projects/<dir>/memory
 ```
+
+The `.sh`/`.py` entries under `claude/workflows/` and `claude/scripts/` are
+symlinks into `scripts/hub/`, which both generations share (`install.sh`
+copies real files).
 
 Install: `./claude/install.sh`; restore the auto-memory for a project with
 `./claude/install-memory.sh ~/code` (Claude Code keys memory by the session's
@@ -79,11 +86,12 @@ agent-kit/
 │   └── mcp-hub-setup/          ← set up the MCP Task Hub (dual-mode: local / generate)
 │       └── SKILL.md
 │
+├── claude/                     ← Claude Code generation (see above)
+├── opencode/                   ← OpenCode generation (see below)
+├── scripts/hub/                ← shared: hub-lane-{setup,merge,park}.sh, hub-queue.py, hub-cli.py
+│
 ├── agents/
-│   └── opencode/               ← OpenCode agent definitions (pi has no agent concept)
-│       ├── hub-runner.md
-│       ├── hub-orchestrator.md
-│       └── openspec-orchestrator.md
+│   └── opencode/legacy-v1/     ← v1 OpenCode agents (hub-runner, hub-orchestrator, openspec-orchestrator) — retained
 │
 ├── skills/                     ← general-purpose skills installed per-project
 │   ├── shared/                 ← works in both OpenCode and pi
@@ -102,8 +110,10 @@ agent-kit/
 ├── tests/
 │   └── test_hub_integration.py ← smoke tests against the live hub (stdlib only)
 │
-├── .opencode/                  ← makes agents/skills live in OpenCode when editing agent-kit
-│   └── agents/                 (symlinks → agents/opencode/)
+├── .opencode/                  ← makes the OpenCode generation live when editing agent-kit
+│   ├── agents/                 (symlinks → opencode/agents/)
+│   ├── commands → opencode/commands
+│   └── skills   → opencode/skills
 │
 └── .github/workflows-disabled/ ← DISABLED pi-agent sync actions (see below)
     ├── sync-template.yml
@@ -236,13 +246,79 @@ planner assigns `metadata.tier`; override it in the hub when you disagree.
 
 ---
 
-## Legacy: OpenCode & pi generations
+## OpenCode generation (current)
 
-Retained but not the current path, and **partially stale**: the v2 hub removed
-the SSE transport these tools were configured against. To use them again,
-point OpenCode/Cursor configs at streamable HTTP
-(`http://127.0.0.1:8050/mcp`) — the old `:8000/sse` examples below no longer
-work. The hub itself is started once per machine (see One-time setup above).
+The same loop for [OpenCode](https://opencode.ai/docs), built from the
+Claude Code one. Roles, prompts, tiers, review gate and lane scripts are the
+same; the differences are mechanical:
+
+- OpenCode has no Workflow tool, so `/hub-drain` and `/hub-spec` are
+  **primary agents** (`hub-drain`, `hub-spec`) that drive the loop with the
+  task tool — one subagent call per lane, several in one message for
+  parallelism. Switch to them with Tab or run the commands.
+- Hub tools are MCP tools named `task-hub_fetch_tasks`,
+  `task-hub_sync_task`, `task-hub_update_task_status` (from the `mcp.task-hub`
+  entry in `opencode.json`). Per-agent `tools:`/`permission:` blocks keep
+  workers from syncing, reviewers from writing, and the drain from editing.
+- The worker protocol lives once, in the `hub-worker-protocol` skill; the
+  three tier agents load it first.
+- Model ids are `anthropic/claude-haiku-4-5`, `anthropic/claude-sonnet-5`,
+  `anthropic/claude-opus-5` — change them in the agent frontmatter if your
+  provider names differ (`opencode models`).
+
+```
+opencode/
+├── agents/
+│   ├── hub-worker.md, hub-worker-haiku.md, hub-worker-opus.md   ← subagents, tiered
+│   ├── hub-reviewer.md         ← opus, read-only, VERDICT: PASS|FAIL
+│   ├── hub-steward.md          ← haiku: runLog, batch sync, land/park via scripts
+│   ├── hub-drain.md            ← PRIMARY: parallel-lane drain loop
+│   └── hub-spec.md             ← PRIMARY: explore ∥ → approaches → judge → draft → critique
+├── commands/                   ← /hub-spec /hub-plan /hub-status /hub-drain
+├── skills/                     ← hub-worker-protocol, hub-plan, hub-status
+├── opencode.json               ← reference config: mcp.task-hub (remote, streamable HTTP), CLAUDE.md instructions
+└── install.sh                  ← copy into ~/.config/opencode (+ --mcp to merge the hub entry)
+```
+
+### Setup
+
+```bash
+# hub running (see One-time setup above), then:
+./agent-kit/opencode/install.sh --mcp     # agents, commands, skills, scripts/hub, task-hub MCP entry
+opencode mcp list                         # → task-hub connected  http://127.0.0.1:8050/mcp
+opencode agent list                       # → hub-drain, hub-spec (primary) + 5 subagents
+```
+
+Restart OpenCode after installing — config is read at startup. Per-project
+instead of global: copy `opencode/opencode.json` into the repo root (project
+config merges over global) and add the repo's gate commands to its
+`permission.bash` allowlist so subagents do not stall on prompts.
+
+### The loop
+
+```
+/hub-spec project=<repo-dir> idea="<one sentence>"     ← hub-spec agent; artifacts uncommitted
+★ review openspec/changes/<id>/ (Specs screen at taskhub.local/ui lists it as Pending review)
+/hub-plan project=<repo-dir> change=<id>               ← skill in the primary agent; audit first, then sync
+/hub-drain project=<repo-dir> change=<id> lanes=3      ← hub-drain agent; worker → review → land per lane
+/hub-status                                            ← queue, blocked reasons, stale claims
+```
+
+The repo checkout of agent-kit is itself a working OpenCode project for
+these (`.opencode/` symlinks into `opencode/`), which is how they are
+validated: `opencode agent list`, `opencode debug agent hub-drain`,
+`opencode debug skill`.
+
+---
+
+## Legacy: OpenCode v1 & pi generations
+
+Retained but not the current path. The OpenCode v1 agents (`hub-runner`,
+`hub-orchestrator`, `openspec-orchestrator`, in `agents/opencode/legacy-v1/`)
+pushed straight from workers and used the removed SSE transport; they are
+kept for reference only. The pi commands still work against the v2 hub once
+the config points at streamable HTTP (`http://127.0.0.1:8050/mcp`). The hub
+itself is started once per machine (see One-time setup above).
 
 ### Bootstrap a new project from the template
 
@@ -297,7 +373,7 @@ python -m pytest tests/test_hub_integration.py -v
 
 ### What the legacy harness unlocks
 
-Once a project is bootstrapped with `agentic-setup`, both pi and OpenCode have the full development loop:
+Once a project is bootstrapped with `agentic-setup`, pi has the full development loop:
 
 ```
 Idea → spec → tasks in hub → agent picks up tasks → implements → commits → pushes → done
@@ -315,26 +391,16 @@ Idea → spec → tasks in hub → agent picks up tasks → implements → commi
 # Loop /hub-run until the queue is empty
 ```
 
-### With OpenCode
-
-```bash
-# Propose and plan (same OpenSpec commands)
-/opsx-propose
-
-# Run a single task
-@hub-runner
-
-# Clear an entire backlog in parallel
-@hub-orchestrator
-```
-
-### The full loop
+### The pi loop
 
 ```
 /opsx-propose           ← agent creates spec + tasks, syncs to hub
-/hub-run (or @hub-runner) ← agent claims next task, implements, commits, pushes
+/hub-run                ← agent claims next task, implements, commits, pushes
 /hub-run ...            ← repeat until fetch_tasks(status="pending") returns []
 ```
+
+(For OpenCode, use the current generation above — `@hub-runner` and
+`@hub-orchestrator` are no longer installed.)
 
 Everything is tracked in the hub. Every task commit gets a Git Note on
 `refs/notes/agent-log` — a permanent AI-blame record of what was done and why,

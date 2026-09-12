@@ -19,9 +19,9 @@ for skill in "$SRC"/skills/*/; do
 done
 # workflows = the Workflow-tool scripts (.js) plus the shell/python helpers the
 # drain calls by absolute path (hub-lane-*.sh, hub-queue.py)
-cp -v "$SRC"/workflows/* "$DST/workflows/"
+cp -vL "$SRC"/workflows/* "$DST/workflows/"
 chmod +x "$DST"/workflows/*.sh
-cp -v "$SRC"/scripts/*.py "$DST/scripts/"
+cp -vL "$SRC"/scripts/*.py "$DST/scripts/"
 chmod +x "$DST"/scripts/*.py
 
 echo "Installed. New sessions pick these up automatically."

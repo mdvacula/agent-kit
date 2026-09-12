@@ -47,9 +47,11 @@ Pi has no agent concept. These are OpenCode-only.
 
 | Agent | Purpose |
 |-------|---------|
-| `hub-runner.md` | Execute one task end-to-end: claim → implement → commit → close |
-| `hub-orchestrator.md` | Coordinate parallel hub-runner subagents across a work queue |
-| `openspec-orchestrator.md` | Plan: parse living spec → sync tasks → hand off to hub-orchestrator |
+| `hub-worker.md` (+`-haiku`, `-opus`) | Execute one task in a lane worktree: claim → implement → gates → commit locally (never push) |
+| `hub-reviewer.md` | Opus read-only review of the task's commit range → VERDICT PASS/FAIL |
+| `hub-steward.md` | Haiku utility: runLog entries, batch sync, land/park lanes |
+| `hub-drain.md` (primary) | Parallel-lane drain: queue → worker → review → fix cycles → land |
+| `hub-spec.md` (primary) | Idea → explore ∥ → approaches → judge → draft → critique → revise (no sync); `/hub-plan` skill reconciles + syncs |
 
 `.opencode/agents/` contains symlinks to these files so OpenCode discovers them
 when editing agent-kit itself without duplicating content.
@@ -120,7 +122,7 @@ GitHub Action runs a pi agent to regenerate the downstream repo.
 ## Integration Tests
 
 `agent-kit` owns smoke tests that verify the live hub from a consumer perspective.
-These run against `http://localhost:8000` and confirm the hub contract matches
+These run against `http://127.0.0.1:8050` and confirm the hub contract matches
 what the skills and agents expect.
 
 OpenCode projects should configure the task hub with SSE transport in
@@ -131,10 +133,10 @@ OpenCode projects should configure the task hub with SSE transport in
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
     "task-hub": {
-      "type": "sse",
-      "url": "http://localhost:8000/sse",
+      "type": "remote",
+      "url": "http://127.0.0.1:8050/mcp",
       "enabled": true,
-      "_comment": "Hub runs via Docker. Start with: cd ~/mcp-task-hub && docker compose up -d. Change port if you edited HUB_PORT in .env."
+      "_comment": "Hub runs via Docker. Start with: cd ~/infra/task-hub && docker compose up -d. Change port if you edited HUB_PORT in .env."
     }
   }
 }
