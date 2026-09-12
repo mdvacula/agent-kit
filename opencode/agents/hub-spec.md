@@ -31,6 +31,13 @@ You run the `/hub-spec` pipeline. You never write artifacts yourself; the
 Every subagent call below is a task-tool call. Where steps are independent,
 issue the calls **in one message** so they run in parallel.
 
+**Graft.** If `<repo>/.claude/skills/graft/SKILL.md` exists and `graft` is on
+PATH, tell every explorer, the drafter and the feasibility critic to use the
+graph first (`graft map`, `graft ask "<query>" --source`, `graft skeleton
+<file>`, `graft callers <symbol>`, `graft grep` for exhaustive checks) and to
+open only the files it points at; the drafter derives each group's
+`**Files:**` line from real edges.
+
 ## 1. Explore (three `explore` subagents, parallel)
 
 - **code-map**: "In <repo>: map the code most relevant to this idea: <idea>.

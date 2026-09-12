@@ -26,12 +26,18 @@ const idea = A && A.idea
 if (!project || !idea) return { error: `args {project, idea} are required — received ${typeof args}: ${String(args).slice(0, 120)}` }
 const repo = A.repo || `/home/mdv/code/${project}`
 const wantedChangeId = A.changeId || null
+// Graft (tree-sitter code graph) is opt-in per repo; when present, explorers and
+// critics query it instead of grep-and-read (exact, $0, refresh-first).
+const graftHint = `If ${repo}/.claude/skills/graft/SKILL.md exists and \`graft\` is on PATH, use the graph first: ` +
+  `\`graft map\` for orientation, \`graft ask "<query>" --source\` for the relevant spans, ` +
+  `\`graft skeleton <file>\` instead of reading a file for its API, \`graft callers <symbol>\` for who depends on what. ` +
+  `Only open source files the graph points at. `
 
 // ── Explore ─────────────────────────────────────────────────────────────────
 phase('Explore')
 const [codeMap, conventions, constraints] = await parallel([
   () => agent(
-    `In ${repo}: map the code most relevant to this idea: "${idea}". ` +
+    `In ${repo}: map the code most relevant to this idea: "${idea}". ${graftHint}` +
     `Report: key files/modules with paths, patterns and utilities that should be reused, ` +
     `any existing partial implementation of this idea, and the test setup. ` +
     `Concise structured brief — you are feeding a design agent, not a human.`,
@@ -98,6 +104,7 @@ const draftPrompt = (extra) =>
   `- Change ID: ${wantedChangeId || 'derive a kebab-case ID consistent with existing change naming; avoid collisions'}.\n` +
   `- Write proposal.md, design.md, tasks.md (checkboxes grouped into coherent subsections — they become hub tasks later), and spec deltas if the schema calls for them, under openspec/changes/<changeId>/.\n` +
   `- tasks.md must include testing and docs work, not just feature code.\n` +
+  `- ${graftHint}Derive each group's "**Files:**" line from real edges (\`graft callers\`/\`graft skeleton\`), not guesses.\n` +
   `- tasks.md is executed by PARALLEL agent lanes (one git worktree each). Author it for width: every group carries a "**Files:**" line naming the path prefixes it edits; a group's "Depends on:" line lists only TRUE data dependencies (it reads what another group writes) — never "safer after", "same subsystem" or "review together"; keep blocker chains short and give the change several independent starting groups (tests may depend on their subject group, not on unrelated groups). Any box that needs a deploy, a live run, a hands-on check or an owner sign-off goes in its own clearly-labelled owner-run group, never mixed into an agent group.\n` +
   `- If "npx --yes @fission-ai/openspec@latest validate <changeId>" works in this repo, run it and fix what it reports; record the output.\n` +
   `- Do NOT commit, do NOT touch code outside openspec/changes/<changeId>/.\n` +
@@ -125,8 +132,8 @@ async function critique() {
       `Return {blockers, majors, minors} as terse strings with file references. Empty arrays if genuinely clean.`,
       { model: 'sonnet', phase: 'Critique', label: 'critic:completeness', schema: CRIT_SCHEMA }),
     () => agent(
-      `Adversarially critique the change at ${dir} for FEASIBILITY against the actual codebase in ${repo}. ` +
-      `Verify referenced files, APIs, schemas, and utilities exist as described; flag anything the design assumes wrongly, ` +
+      `Adversarially critique the change at ${dir} for FEASIBILITY against the actual codebase in ${repo}. ${graftHint}` +
+      `Verify referenced files, APIs, schemas, and utilities exist as described (\`graft grep\`/\`graft callers\` are exhaustive where the graph exists); flag anything the design assumes wrongly, ` +
       `and any conflict with repo guardrails or the constraints docs. Return {blockers, majors, minors}.`,
       { model: 'sonnet', phase: 'Critique', label: 'critic:feasibility', schema: CRIT_SCHEMA }),
     () => agent(
