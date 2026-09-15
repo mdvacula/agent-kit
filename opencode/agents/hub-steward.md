@@ -37,7 +37,14 @@ landed range):
    (`date -u +%Y-%m-%dT%H:%M:%SZ`).
 3. `task-hub_sync_task(id=..., title=<unchanged>, metadata={"runLog": <full updated array>})`.
    sync_task merges top-level keys, so you MUST send the complete array, not
-   just the new entry. Never change status or other metadata keys.
+   just the new entry. Never change other metadata keys.
+4. **Status**: if the entry has a non-null `landed` and the prompt says the
+   task is landed, `task-hub_update_task_status(id, "completed", notes="landed <range>")`
+   — `completed` means "on main" and only this step sets it. Otherwise leave
+   the status alone (`in-review` or `blocked` as the drain set it).
+5. **Metrics**: if the prompt gives a task id to measure, run
+   `python3 ~/.config/opencode/scripts/hub/measure-drain.py --project <project> --task <id> --latest`
+   and put its JSON object into the entry as `metrics` before step 3.
 
 ## Job B: land a lane
 

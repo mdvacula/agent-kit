@@ -1,0 +1,1 @@
+../../scripts/hub/measure-drain.py

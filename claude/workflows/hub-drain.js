@@ -242,11 +242,12 @@ async function runTask(task, n, wt) {
     let landed = null
     if (worker.commitRange && v && v.verdict === 'PASS') landed = await land(task, n)
     else if (worker.commitRange) await sh(`bash ${SCRIPTS}/hub-lane-park.sh ${repo} ${n} ${task.id}`, `park:${task.id}`, 'Land')
+    const metrics = await taskMetrics(task.id)
     await agent(
-      `Job A: record a runLog entry on task ${task.id}. Entry JSON: ` +
+      `Job A: record a runLog entry on task ${task.id} — leave its status alone (blocked path). Entry JSON: ` +
       JSON.stringify({ agent: TIER_AGENT[currentTier], tier: currentTier, lane, commitRange: worker.commitRange || null,
         gates: worker.gates, outcome: 'blocked', blockReason: worker.blockReason || worker.summary,
-        verdict: v ? v.verdict : null, findings: v ? v.findings : [], landed }),
+        verdict: v ? v.verdict : null, findings: v ? v.findings : [], landed, metrics }),
       { agentType: 'hub-steward', phase: 'Land', label: `runlog-blocked:${task.id}` },
     )
     if (landed) {
@@ -307,14 +308,22 @@ async function runTask(task, n, wt) {
   }
 
   const landed = await land(task, n)
+  const metrics = await taskMetrics(task.id)
   await agent(
-    `Job A: record a runLog entry on task ${task.id}. Entry JSON: ` +
+    `Job A: record a runLog entry on task ${task.id}${landed ? ` — the task IS landed (${landed}); after the runLog, set its status to completed` : ' — NOT landed; leave the status alone'}. Entry JSON: ` +
     JSON.stringify({ agent: TIER_AGENT[currentTier], tier: currentTier, lane, commitRange: worker.commitRange,
       gates: worker.gates, verdict: verdict.verdict, findingsCount: verdict.findings.length,
-      fixCycles: cycles, summary: worker.summary, landed }),
+      fixCycles: cycles, summary: worker.summary, landed, metrics }),
     { agentType: 'hub-steward', phase: 'Land', label: `runlog:${task.id}` },
   )
   completed.push({ id: task.id, lane, commitRange: worker.commitRange, fixCycles: cycles, landed })
+}
+
+// Per-agent effort for this task (reads, graft calls, tokens, wall) measured
+// from the subagent transcripts — goes into the runLog entry as `metrics`.
+async function taskMetrics(taskId) {
+  const r = await sh(`python3 ${SCRIPTS}/measure-drain.py --project ${project} --task ${taskId} --latest 2>/dev/null`, `metrics:${taskId}`, 'Land')
+  try { return r.ok ? JSON.parse(r.output.trim() || '{}') : {} } catch { return {} }
 }
 
 // Rebase the lane onto main, fast-forward main, push — one lane at a time.

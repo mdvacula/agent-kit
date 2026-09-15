@@ -86,6 +86,9 @@ def main():
     ap.add_argument("--since", help="YYYY-MM-DD (UTC) — only transcripts starting on/after this date")
     ap.add_argument("--role", default="all")
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--task", help="only runs for this task id")
+    ap.add_argument("--latest", action="store_true",
+                    help="with --task: emit one object {worker, reviewer, fix:[...]} from the most recent runs (for runLog.metrics)")
     a = ap.parse_args()
     base = os.path.expanduser(f"~/.claude/projects/-home-mdv-code-{a.project}")
     files = glob.glob(f"{base}/*/subagents/**/agent-*.jsonl", recursive=True)
@@ -93,6 +96,22 @@ def main():
     rows = [r for r in rows if r["role"] in ("worker", "fix", "reviewer") and r["turns"] > 0]
     if a.since: rows = [r for r in rows if r["start"] and r["start"][:10] >= a.since]
     if a.role != "all": rows = [r for r in rows if r["role"] == a.role]
+    if a.task: rows = [r for r in rows if r["task"] == a.task]
+    if a.latest:
+        # newest worker run, the newest reviewer run after it, and the fix runs between
+        rows.sort(key=lambda r: r["start"] or "")
+        keep = ("reads", "graft", "edits", "turns", "in_tok", "out_tok", "wall_s", "model")
+        slim = lambda r: {k: r[k] for k in keep}
+        workers = [r for r in rows if r["role"] == "worker"]
+        out = {}
+        if workers:
+            w = workers[-1]; out["worker"] = slim(w)
+            after = [r for r in rows if (r["start"] or "") >= (w["start"] or "")]
+            revs = [r for r in after if r["role"] == "reviewer"]
+            if revs: out["reviewer"] = slim(revs[-1])
+            fixes = [slim(r) for r in after if r["role"] == "fix"]
+            if fixes: out["fix"] = fixes
+        json.dump(out, sys.stdout); return
     if a.json:
         json.dump(rows, sys.stdout, indent=1); return
     print(f"{a.project}: {len(rows)} agent runs" + (f" since {a.since}" if a.since else ""))

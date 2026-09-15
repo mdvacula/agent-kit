@@ -61,7 +61,9 @@ repo path, and possibly review findings to fix.
    The orchestrator pushes after review passes.
 9. **Tick tracking**: if the task's checkboxes exist in the change's `tasks.md`,
    tick them (include in the same commit or a tiny follow-up commit).
-10. **Complete**: `mcp__task-hub__update_task_status(id, "completed")`.
+10. **Hand off for review**: `mcp__task-hub__update_task_status(id, "in-review")`.
+    Never set `completed` yourself — the drain sets it after the reviewer
+    passes your commits and the lane is landed on main.
 11. **Report** (this is your return value — raw data, no pleasantries):
     task id, one-paragraph summary, commit range `<base>..<head SHA>`, files
     touched, gate commands run and their results, anything the reviewer should

@@ -100,12 +100,17 @@ the worktree path and the range. Parse `VERDICT` and `FINDINGS`.
 
 ## 6. Land (serialised — never two lanes at once)
 
-1. steward Job A: append the runLog entry
-   `{agent, tier, lane, commitRange, gates, verdict, findings: <count>, fixCycles, outcome, landed}`.
-2. steward Job B: `hub-lane-merge.sh <repo> <n>` → `MERGED a..b`. On exit 2
+Status semantics: a worker leaves its task `in-review`; **`completed` means
+landed on main** and only the steward sets it, after the merge.
+
+1. steward Job B: `hub-lane-merge.sh <repo> <n>` → `MERGED a..b`. On exit 2
    (rebase conflict): park the lane (Job E) and mark the task `blocked`
    ("rebase conflict on land — parked/<branch>") via Job C. On exit 3 or 4:
    stop the whole run and report — the main checkout needs the owner.
+2. steward Job A: append the runLog entry
+   `{agent, tier, lane, commitRange, gates, verdict, findings: <count>, fixCycles, outcome, landed, metrics}`
+   — tell it the task id to measure (Job A step 5 fills `metrics` from the
+   transcripts) and whether the task IS landed, so it sets `completed`.
 3. Reset the lane for its next task (`hub-lane-setup.sh` again).
 
 ## 7. Loop and finish

@@ -57,7 +57,9 @@ path your prompt names (a lane worktree). Follow every step in order.
 9. **Tick tracking**: if the task's checkboxes exist in the change's
    `tasks.md` (see `metadata.boxes`), tick them in the same commit or a tiny
    follow-up commit. Leave `OWNER OPS:` / `OWNER DECISION:` boxes unticked.
-10. **Complete**: `task-hub_update_task_status(id=<task-id>, status="completed")`.
+10. **Hand off for review**: `task-hub_update_task_status(id=<task-id>, status="in-review")`.
+    Never set `completed` yourself — the drain sets it after the reviewer
+    passes your commits and the lane is landed on main.
 11. **Report** (this is your return value — raw data, no pleasantries):
     task id, one-paragraph summary, commit range `<base>..<head SHA>`, files
     touched, gate commands run and their results, anything the reviewer

@@ -15,10 +15,16 @@ there, then drill into specifics below if needed.
    - Counts by status, grouped project → change.
    - **Blocked tasks**: list each with the latest `metadata.statusNotes` entry
      (the reason) — these need user decisions.
-   - **Stale claims**: `in-progress` with `updated_at` older than ~2 hours is
-     probably an orphaned claim from a dead run. Offer (don't auto-do) a reset:
+   - **In review**: `in-review` = a worker committed in its lane; review,
+     fix cycles or landing are still ahead. `completed` means landed on main.
+   - **Stale claims**: `in-progress` or `in-review` with `updated_at` older
+     than ~2 hours is probably an orphaned claim from a dead run. Offer (don't auto-do) a reset:
      `task-hub_update_task_status(id, "pending", notes="reset stale claim")`.
    - Recent `runLog` activity for anything currently draining.
-3. Remind: the live view is `http://taskhub.local/ui` from any LAN browser.
+3. Remind: the live view is `http://taskhub.local/ui` from any LAN browser;
+   `/ui/#metrics` has per-change benchmarks (pass-first rate, fix cycles,
+   graft adoption, median reads/tokens/lead time) and
+   `python3 ~/.config/opencode/scripts/hub/measure-drain.py --project <p> [--since D]`
+   gives the same per agent run from the transcripts.
 
 Keep the output compact — a table for counts, prose for blocked reasons.

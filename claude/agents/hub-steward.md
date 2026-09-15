@@ -18,7 +18,11 @@ results, reviewer verdict, findings count, fix cycles):
 2. Append the new entry (add an ISO-8601 `at` timestamp via `date -u +%Y-%m-%dT%H:%M:%SZ`).
 3. `mcp__task-hub__sync_task(id=..., title=<unchanged>, metadata={"runLog": <full updated array>})`.
    sync_task merges top-level keys, so you MUST send the complete array, not
-   just the new entry. Never change status or other metadata keys.
+   just the new entry. Never change other metadata keys.
+4. **Status**: if the entry has a non-null `landed` and the prompt says the
+   task is landed, `mcp__task-hub__update_task_status(id, "completed", notes="landed <range>")`
+   — `completed` means "on main" and only this step sets it. Otherwise leave
+   the status alone (the task stays `in-review` or `blocked` as the drain set it).
 
 ## Job D: batch-sync planned tasks
 

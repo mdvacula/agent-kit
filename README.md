@@ -205,13 +205,20 @@ computes each lane's runnable set from the hub — `blockedBy` satisfied and
 `touches` takes a change-wide lock. `laneOffset` lets two drains for different
 projects share the box.
 
-Per task: a worker at the task's tier claims it, reads the specRef section
-narrowly, implements, runs the gates (**a deploy is never a gate**), commits
-locally — **workers never push**. An Opus reviewer inspects the commit range
+Per task: a worker at the task's tier claims it (`in-progress`), reads the
+specRef section narrowly, implements, runs the gates (**a deploy is never a
+gate**), commits locally and hands off as `in-review` — **workers never push**
+and never mark `completed`. An Opus reviewer inspects the commit range
 against the spec and re-runs gates; on FAIL the findings go to a fresh worker
-for a fix cycle (max 2, second one bumps the tier). After PASS a steward records
-the `runLog` and lands the lane with `hub-lane-merge.sh` (rebase onto main,
-ff-merge, push — serialised across lanes). A task that fails twice, or blocks
+for a fix cycle (max 2, second one bumps the tier). After PASS the lane is landed with
+`hub-lane-merge.sh` (rebase onto main, ff-merge, push — serialised across
+lanes) and a steward records the `runLog` entry — verdict, fix cycles, landed
+range, and per-agent `metrics` (reads, graft calls, tokens, wall time measured
+from the subagent transcripts by `scripts/hub/measure-drain.py`) — and only
+then sets `completed`, so `completed` means "on main" and `blockedBy` never
+releases a dependent early. The hub UI's Metrics screen (`/ui/#metrics`)
+aggregates those per change; the Tasks sheet shows each status transition
+from `metadata.timeline`. A task that fails twice, or blocks
 with code we chose not to land, is parked on `parked/<task>-<timestamp>` and
 the lane resets. Owner-gated stops (`OWNER OPS:` / `OWNER DECISION:` boxes)
 are recorded as `blocked` and skipped — they never end the run. Watch live via

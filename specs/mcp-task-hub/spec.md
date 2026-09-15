@@ -24,7 +24,7 @@ removed in v2). One hub serves many repos — tasks are namespaced by `project`.
 |---|---|---|
 | `id` | TEXT PK | stable kebab-case: `<change-id>-<task-slug>` |
 | `title` | TEXT | imperative summary |
-| `status` | TEXT | `pending` \| `in-progress` \| `completed` \| `blocked` — validated, invalid values raise |
+| `status` | TEXT | `pending` \| `in-progress` \| `in-review` \| `completed` \| `blocked` — validated, invalid values raise; every transition appended to `metadata.timeline` |
 | `project` | TEXT | **v2, first-class + indexed** — owning repo dir name. Idempotent `ALTER TABLE` migration adds it to v1 databases |
 | `metadata` | TEXT JSON | see below |
 | `created_at`, `updated_at` | TEXT | UTC ISO-8601 |
