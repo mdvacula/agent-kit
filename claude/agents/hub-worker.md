@@ -27,13 +27,15 @@ repo path, and possibly review findings to fix.
    Budget roughly ten read calls before the first edit; measured 2026-09-02,
    workers averaged 45 read-type calls and spent a third of their time
    re-reading artifacts that their section already summarized.
-   **If the repo is graft-indexed** (`.claude/skills/graft/SKILL.md` exists
-   and `command -v graft` works), orient through the graph before opening
-   source: `graft ask "<task title or the symbols the spec names>" --source`
-   for the relevant spans, `graft skeleton <file>` instead of reading a file
-   for its API, `graft callers <symbol>` before changing a signature. Run
-   these in YOUR worktree (they refresh for free and see your edits). They
-   replace exploration reads, not the specRef read.
+   **Graft first — do this before any Read/Grep/Glob of source.** In your
+   worktree run `graft ask "<task title + the symbols the spec names>" --source`
+   and, for each file you will edit, `graft skeleton <file>`; before changing
+   a signature, `graft callers <symbol>`. Do not check whether the repo is
+   indexed — just run it: if the command is missing or errors, note that in
+   your report and continue with normal reads. Graft output replaces
+   exploration reads (it is exact and refresh-first, so it sees your own
+   edits), not the specRef read. Your report's "gates" section must state
+   how many graft calls you made.
 5. **Implement** the task minimally and completely. No scope creep: if you notice
    adjacent problems, mention them in your report instead of fixing them.
 6. **Quality gates**: detect and run the repo's checks (for pnpm repos typically
