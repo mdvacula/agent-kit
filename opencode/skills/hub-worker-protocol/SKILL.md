@@ -25,13 +25,23 @@ path your prompt names (a lane worktree). Follow every step in order.
    first edit.
    **Graft first — do this before any Read/Grep/Glob of source.** In your
    worktree run `graft ask "<task title + the symbols the spec names>" --source`
-   and, for each file you will edit, `graft skeleton <file>`; before changing
-   a signature, `graft callers <symbol>`. Do not check whether the repo is
-   indexed — just run it: if the command is missing or errors, note that in
-   your report and continue with normal reads. Graft output replaces
-   exploration reads (it is exact and refresh-first, so it sees your own
-   edits), not the specRef read. Your report's "gates" section must state
-   how many graft calls you made.
+   — **always `--source`**: it inlines the relevant spans, and those spans
+   ARE your read. Do not open a file graft already showed you unless you need
+   lines outside the span; then `Read` with an offset/limit, never the whole
+   file. For any file you will edit, `graft skeleton <file>` first, then read
+   only the ranges you touch. Before changing a signature, `graft callers
+   <symbol>`. The CLI verbs are exactly: `ask`, `skeleton`, `callers`, `grep`,
+   `map`, `check` (the MCP tool names like `trace_calls` are not CLI
+   subcommands). Do not check whether the repo is indexed — just run it: if
+   the command is missing or errors, note that in your report and continue
+   with normal reads. Your report's "gates" section must state how many graft
+   calls you made.
+   **Do not probe the environment.** Gate commands, how e2e runs, which env
+   files exist in a lane, and what backing services you may touch are stated
+   in the repo's AGENTS.md/CLAUDE.md ("Agent lane facts" or equivalent) — read
+   that section instead of running `docker ps`, `ss`, `ps`, `cat .env`, or
+   port scans. If the facts you need are missing there, say so in your report
+   (that is a repo-docs finding), do not go looking.
 5. **Implement** the task minimally and completely. No scope creep: if you
    notice adjacent problems, mention them in your report instead of fixing
    them.
@@ -92,5 +102,8 @@ run.
   systemd, env-file edits, or writes to any live database — even to "make it
   actually run" or "verify on real data". Those backends serve real users. A
   task that needs a deploy or a live run ends on the Blocked path with the
-  exact commands the owner should run.
+  exact commands the owner should run. This includes **reading** live
+  databases with credentials you find in env files (`psql`, `convex run`,
+  admin APIs) — use fixtures, tests, and the code; a task that needs real
+  data says so and names the owner-run step.
 - Never commit secrets, .env files, or generated artifacts.
