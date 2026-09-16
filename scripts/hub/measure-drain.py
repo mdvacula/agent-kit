@@ -22,6 +22,7 @@ import argparse, glob, json, os, re, statistics, sys
 from datetime import datetime, timezone
 
 READ_BASH = re.compile(r"^\s*(?:cd\s+\S+\s*&&\s*)?(cat|sed|head|tail|less|ls|rg|grep|find|wc|tree|jq|git\s+(?:log|diff|show|status|blame|rev-parse))\b")
+GRAFT_ERR = re.compile(r"command not found|No such file|not built|run `?graft build|no graph|not a graft|ENOENT|Unknown command|error: unknown", re.I)
 GRAFT_BASH = re.compile(r"(?:^|&&|;|\|)\s*(?:npx\s+(?:-y\s+)?(?:@nanonets/)?)?graft\s+(ask|skeleton|callers|map|grep|check|build)\b")
 ROLE = [("Run task ", "worker"), ("Fix-cycle for task ", "fix"), ("Review task ", "reviewer"), ("Job ", "steward")]
 # hub-spec workflow roles (prompt openers from hub-spec.js)
@@ -59,6 +60,16 @@ def analyze(path):
     wf = re.search(r"/workflows/(wf_[^/]+)/", path)
     out = {"file": path, "role": role, "task": m.group(1) if m else None, "wf": wf.group(1) if wf else None, "reads": 0, "graft": 0, "edits": 0,
            "tools": 0, "turns": 0, "in_tok": 0, "out_tok": 0, "model": None, "start": None, "end": None}
+    results = {}  # tool_use id → result text: an errored graft call (repo not indexed) is not graft use
+    for d in recs:
+        if d.get("type") != "user": continue
+        c = (d.get("message") or {}).get("content")
+        if not isinstance(c, list): continue
+        for x in c:
+            if isinstance(x, dict) and x.get("type") == "tool_result":
+                body = x.get("content")
+                results[x.get("tool_use_id", "")] = body if isinstance(body, str) else " ".join(y.get("text", "") for y in body or [] if isinstance(y, dict))
+    graft_ok = lambda tid: not GRAFT_ERR.search(results.get(tid, "")[:600])
     for d in recs:
         ts = d.get("timestamp")
         if ts:
@@ -76,10 +87,12 @@ def analyze(path):
             name = x.get("name", ""); inp = x.get("input") or {}
             if name in ("Read", "Grep", "Glob"): out["reads"] += 1
             elif name in ("Edit", "Write", "MultiEdit"): out["edits"] += 1
-            elif name.startswith("mcp__graft__"): out["graft"] += 1
+            elif name.startswith("mcp__graft__"):
+                if graft_ok(x.get("id", "")): out["graft"] += 1
             elif name == "Bash":
                 cmd = inp.get("command", "") or ""
-                if GRAFT_BASH.search(cmd): out["graft"] += 1
+                if GRAFT_BASH.search(cmd):
+                    if graft_ok(x.get("id", "")): out["graft"] += 1
                 elif READ_BASH.match(cmd): out["reads"] += 1
     if out["start"] and out["end"]:
         f = datetime.fromisoformat(out["start"].replace("Z", "+00:00")); l = datetime.fromisoformat(out["end"].replace("Z", "+00:00"))
