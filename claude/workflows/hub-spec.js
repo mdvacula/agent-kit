@@ -107,6 +107,7 @@ const draftPrompt = (extra) =>
   `- ${graftHint}Derive each group's "**Files:**" line from real edges (\`graft callers\`/\`graft skeleton\`), not guesses.\n` +
   `- tasks.md is executed by PARALLEL agent lanes (one git worktree each). Author it for width: every group carries a "**Files:**" line naming the path prefixes it edits; a group's "Depends on:" line lists only TRUE data dependencies (it reads what another group writes) — never "safer after", "same subsystem" or "review together"; keep blocker chains short and give the change several independent starting groups (tests may depend on their subject group, not on unrelated groups). Any box that needs a deploy, a live run, a hands-on check or an owner sign-off goes in its own clearly-labelled owner-run group, never mixed into an agent group.\n` +
   `- If "npx --yes @fission-ai/openspec@latest validate <changeId>" works in this repo, run it and fix what it reports; record the output.\n` +
+  `- Write each artifact with the Write tool once (no bash heredocs); later fixes are Edit calls.\n` +
   `- Do NOT commit, do NOT touch code outside openspec/changes/<changeId>/.\n` +
   (extra || '') +
   `\nReturn {changeId, files (paths written), summary, validation}.`
@@ -129,11 +130,12 @@ async function critique() {
     () => agent(
       `Adversarially critique the change at ${dir} for COMPLETENESS against the intent "${idea}" and this approach:\n${judgment.synthesis}\n` +
       `What outcome, edge case, migration, or rollout step is missing? Missing testing/docs tasks are majors. ` +
-      `Return {blockers, majors, minors} as terse strings with file references. Empty arrays if genuinely clean.`,
+      `Return {blockers, majors, minors} as terse strings with file references — at most 25 words each, at most 12 findings total, no restating the artifact. Empty arrays if genuinely clean.`,
       { model: 'sonnet', phase: 'Critique', label: 'critic:completeness', schema: CRIT_SCHEMA }),
     () => agent(
-      `Adversarially critique the change at ${dir} for FEASIBILITY against the actual codebase in ${repo}. ${graftHint}` +
-      `Verify referenced files, APIs, schemas, and utilities exist as described (\`graft grep\`/\`graft callers\` are exhaustive where the graph exists); flag anything the design assumes wrongly, ` +
+      `Adversarially critique the change at ${dir} for FEASIBILITY against the actual codebase in ${repo}. ` +
+      `Verification method (mandatory, do this before any grep or file read): for EVERY file, symbol, API, schema field and utility the artifacts name, run \`graft grep "<literal>"\` (exhaustive, grouped by symbol) or \`graft callers <symbol>\` in ${repo}; use \`graft skeleton <file>\` to check a file's real API and \`graft ask "<claim>" --source\` to test a design claim against the code. Fall back to grep/Read only for unindexed files (docs, config) or if graft errors — and say so. ` +
+      `Verify referenced files, APIs, schemas, and utilities exist as described; flag anything the design assumes wrongly, ` +
       `and any conflict with repo guardrails or the constraints docs. Return {blockers, majors, minors}.`,
       { model: 'sonnet', phase: 'Critique', label: 'critic:feasibility', schema: CRIT_SCHEMA }),
     () => agent(
@@ -155,7 +157,7 @@ if (allBlockers.length + allMajors.length > 0) {
   revised = true
   const fixes = [...allBlockers.map(b => `[blocker] ${b}`), ...allMajors.map(m => `[major] ${m}`)].join('\n- ')
   draft = await agent(
-    draftPrompt(`- The artifacts already exist at openspec/changes/${draft.changeId}/ — REVISE them in place to resolve these critique findings, do not rewrite from scratch:\n- ${fixes}\n`),
+    draftPrompt(`- The artifacts already exist at openspec/changes/${draft.changeId}/ — REVISE them in place with targeted Edit calls (never Write/heredoc a whole file again; measured 2026-09-16: revise passes re-emitted ~20k chars per file) to resolve these critique findings, do not rewrite from scratch:\n- ${fixes}\n`),
     { model: 'opus', phase: 'Revise', label: 'revise-artifacts', schema: DRAFT_SCHEMA },
   )
   if (!draft) return { stopped: 'revise-failed' }

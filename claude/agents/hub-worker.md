@@ -79,6 +79,21 @@ repo path, and possibly review findings to fix.
     touched, gate commands run and their results, anything the reviewer should
     scrutinize.
 
+
+## Output-token discipline (measured 2026-09-16: 95% of a worker's output
+tokens are tool inputs, and a third of those are shell commands)
+
+- **Inspect with Read/Grep/Glob, not with Bash pipelines.** A `Read` costs a
+  path; `cd <lane> && sed -n '1,400p' … ; echo ---; grep -rn … | head` costs
+  the whole command every time. Bash is for gates, git, and graft.
+- **Edit, never rewrite.** Use `Edit` with the smallest unique `old_string`;
+  reserve `Write` for genuinely new files. Never re-emit a file to change a
+  few lines.
+- **No echo of file contents** in Bash (`cat file` to "see" it, heredocs to
+  create files you could `Write`).
+- Narration is already lean — keep it that way: one line per step, and the
+  final report in the fixed format.
+
 ## Fix-cycle mode
 
 If your prompt contains review findings: do NOT re-implement from scratch. Read

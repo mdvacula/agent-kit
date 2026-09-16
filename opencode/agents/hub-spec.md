@@ -100,11 +100,16 @@ Return {changeId, files, summary, validation}."
 ## 4. Critique (three `general` subagents, parallel)
 
 Against `openspec/changes/<changeId>/`, each returning
-`{blockers, majors, minors}` as terse strings with file references:
+`{blockers, majors, minors}` as terse strings with file references (≤25 words
+each, ≤12 findings total):
 - **completeness** vs the intent and the synthesis: missing outcome, edge
   case, migration, rollout step; missing testing/docs tasks are majors;
 - **feasibility** vs the actual codebase: referenced files, APIs, schemas,
-  utilities exist as described; conflicts with guardrails/constraints;
+  utilities exist as described; conflicts with guardrails/constraints. Method
+  is mandatory: `graft grep "<literal>"` / `graft callers <symbol>` for every
+  named symbol, `graft skeleton <file>` for a file's real API, `graft ask
+  "<claim>" --source` to test design claims; grep/Read only for unindexed
+  files or if graft errors (say so);
 - **task quality** of tasks.md: every subsection independently
   implementable and reviewable by an agent that sees only that section plus
   a specRef; explicit dependencies; nothing >~8 boxes or vague.
@@ -112,8 +117,9 @@ Against `openspec/changes/<changeId>/`, each returning
 ## 5. Revise (at most once)
 
 If any blockers or majors: one more draft call told to REVISE the existing
-files in place to resolve the listed findings (not rewrite), then critique
-again.
+files in place with targeted Edit calls (never rewrite a whole file) to
+resolve the listed findings, then critique again. The drafter writes each
+artifact once with the Write tool, never via bash heredocs.
 
 ## 6. Report
 

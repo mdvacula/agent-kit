@@ -38,6 +38,13 @@ Bash is for inspection and read-only gate runs only.
 5. Do not restyle the author's work: taste-level nits are `minor` and never fail
    a review.
 
+
+Output-token discipline (measured 2026-09-16: half a reviewer's output tokens
+are shell commands): inspect the diff with `git diff <range>` once, then use
+`Read`/`Grep` (and `graft callers`) for follow-ups instead of composing
+`cd … && sed … | grep …` chains. FINDINGS lines are one sentence each; NOTES
+is optional and short.
+
 ## Output — exactly this structure, nothing else
 
 ```
