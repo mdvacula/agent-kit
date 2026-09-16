@@ -24,6 +24,17 @@ from datetime import datetime, timezone
 READ_BASH = re.compile(r"^\s*(?:cd\s+\S+\s*&&\s*)?(cat|sed|head|tail|less|ls|rg|grep|find|wc|tree|jq|git\s+(?:log|diff|show|status|blame|rev-parse))\b")
 GRAFT_BASH = re.compile(r"(?:^|&&|;|\|)\s*(?:npx\s+(?:-y\s+)?(?:@nanonets/)?)?graft\s+(ask|skeleton|callers|map|grep|check|build)\b")
 ROLE = [("Run task ", "worker"), ("Fix-cycle for task ", "fix"), ("Review task ", "reviewer"), ("Job ", "steward")]
+# hub-spec workflow roles (prompt openers from hub-spec.js)
+SPEC_ROLE = [
+    ("map the code most relevant", "spec:code-map"),
+    ("read openspec/project.md", "spec:conventions"),
+    ("hunt for constraints", "spec:constraints"),
+    ("Design an implementation approach", "spec:approach"),
+    ("You are judging", "spec:judge"),
+    ("Author the OpenSpec change artifacts", "spec:draft"),
+    ("Adversarially critique", "spec:critic"),
+]
+SPEC_ROLES = tuple(r for _, r in SPEC_ROLE)
 TASK_RE = re.compile(r"^(?:Run task|Fix-cycle for task|Review task) (\S+)")
 
 def first_user_text(recs):
@@ -42,9 +53,11 @@ def analyze(path):
         try: recs.append(json.loads(line))
         except Exception: pass
     prompt = first_user_text(recs)
-    role = next((r for p, r in ROLE if prompt.startswith(p)), "other")
+    role = next((r for p, r in ROLE if prompt.startswith(p)), None) \
+        or next((r for p, r in SPEC_ROLE if p in prompt[:400]), "other")
     m = TASK_RE.match(prompt)
-    out = {"file": path, "role": role, "task": m.group(1) if m else None, "reads": 0, "graft": 0, "edits": 0,
+    wf = re.search(r"/workflows/(wf_[^/]+)/", path)
+    out = {"file": path, "role": role, "task": m.group(1) if m else None, "wf": wf.group(1) if wf else None, "reads": 0, "graft": 0, "edits": 0,
            "tools": 0, "turns": 0, "in_tok": 0, "out_tok": 0, "model": None, "start": None, "end": None}
     for d in recs:
         ts = d.get("timestamp")
@@ -85,6 +98,8 @@ def main():
     ap.add_argument("--project", required=True, help="repo dir name under ~/code (transcripts in ~/.claude/projects/-home-mdv-code-<project>)")
     ap.add_argument("--since", help="YYYY-MM-DD (UTC) — only transcripts starting on/after this date")
     ap.add_argument("--role", default="all")
+    ap.add_argument("--phase", default="drain", choices=["drain", "spec"],
+                    help="drain = worker/fix/reviewer runs (default); spec = hub-spec explorers/approaches/judge/draft/critics")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--task", help="only runs for this task id")
     ap.add_argument("--latest", action="store_true",
@@ -93,7 +108,8 @@ def main():
     base = os.path.expanduser(f"~/.claude/projects/-home-mdv-code-{a.project}")
     files = glob.glob(f"{base}/*/subagents/**/agent-*.jsonl", recursive=True)
     rows = [analyze(f) for f in files]
-    rows = [r for r in rows if r["role"] in ("worker", "fix", "reviewer") and r["turns"] > 0]
+    wanted = ("worker", "fix", "reviewer") if a.phase == "drain" else SPEC_ROLES
+    rows = [r for r in rows if r["role"] in wanted and r["turns"] > 0]
     if a.since: rows = [r for r in rows if r["start"] and r["start"][:10] >= a.since]
     if a.role != "all": rows = [r for r in rows if r["role"] == a.role]
     if a.task: rows = [r for r in rows if r["task"] == a.task]
@@ -116,7 +132,7 @@ def main():
         json.dump(rows, sys.stdout, indent=1); return
     print(f"{a.project}: {len(rows)} agent runs" + (f" since {a.since}" if a.since else ""))
     print(f"{'role':9} {'graft?':7} {'n':>4}  {'reads med/mean':>15} {'graft':>7} {'edits':>7} {'turns':>9} {'in_tok(k)':>12} {'out_tok(k)':>11} {'wall_s':>9}")
-    for role in ("worker", "fix", "reviewer"):
+    for role in (("worker", "fix", "reviewer") if a.phase == "drain" else SPEC_ROLES):
         for used in (False, True):
             g = [r for r in rows if r["role"] == role and (r["graft"] > 0) == used]
             if not g: continue
