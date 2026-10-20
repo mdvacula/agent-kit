@@ -32,6 +32,13 @@ else
   git -C "$REPO" worktree add -q -B "$BR" "$WT" "$BASE"
 fi
 
+# Stale generated route types. `.next/` is gitignored, so the clean above never
+# touches it, and Next's typegen output from an older build (2026-10-20: lanes
+# carried `.next/types` + `.next/dev/types` from a 2026-09-16 build of an older
+# Next) makes `tsc --noEmit` fail with dozens of errors unrelated to the diff.
+# The next build/dev run regenerates them; the build output itself is kept.
+rm -rf "$WT/.next/types" "$WT/.next/dev/types" "$WT/frontend/.next/types" "$WT/frontend/.next/dev/types"
+
 # Gitignored inputs the gates need. Deploy/service secrets are deliberately NOT
 # copied — workers never deploy (hub-worker hard rules).
 for f in .env.local frontend/.env.local worker/.env.local frontend/next-env.d.ts; do
