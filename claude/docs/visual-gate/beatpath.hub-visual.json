@@ -1,0 +1,12 @@
+{
+  "$comment": "lane-visual.mjs config for beatpath — identical to the script's built-in beatpath profile. See agent-kit claude/docs/visual-gate/README.md.",
+  "appDir": "frontend",
+  "serverJs": "frontend/server.js",
+  "portBase": 3100,
+  "defaultRoutes": ["/"],
+  "envFiles": ["{app}/.env.local"],
+  "env": { "CONVEX_URL": "${LANE_VISUAL_CONVEX_URL:-http://127.0.0.1:3210}" },
+  "hostMappings": ["beatpath-api.local", "beatpath.local"],
+  "playwrightFrom": ["${LANE_VISUAL_CAPTURE_DIR:-/home/mdv/code/beatpath/tools/capture}"],
+  "ignoreConsole": ["clerk"]
+}

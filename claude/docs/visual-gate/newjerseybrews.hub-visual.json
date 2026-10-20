@@ -1,0 +1,32 @@
+{
+  "$comment": "lane-visual.mjs config for newjerseybrews. See agent-kit claude/docs/visual-gate/README.md. Lanes have no .env, so the server env comes from the main checkout's (read-only DB at 127.0.0.1:5436); LAN/production URLs and error-reporting DSNs are overridden or denied.",
+  "appDir": ".",
+  "serverJs": "server.js",
+  "portBase": 3200,
+  "defaultRoutes": ["/"],
+  "envFiles": ["{main}/.env", "{repo}/.env", "{repo}/.env.local"],
+  "env": {
+    "NEXT_PUBLIC_APP_URL": "http://localhost:{port}",
+    "BASEMAP_DIR": "{main}/data/basemap",
+    "MEDIA_DIR": "{main}/media",
+    "SENTRY_DSN": "",
+    "NEXT_PUBLIC_SENTRY_DSN": "",
+    "PAYLOAD_MCP_ENABLED": "",
+    "UMAMI_ORIGIN": "",
+    "EXA_API_KEY": ""
+  },
+  "denyHosts": [
+    "newjerseybrews.local",
+    "njbrews.local",
+    "newjerseybrews.com",
+    "*.newjerseybrews.com",
+    "glitchtip.local",
+    "*.up.railway.app"
+  ],
+  "launchArgs": ["--headless=new", "--no-sandbox", "--enable-unsafe-swiftshader"],
+  "playwrightFrom": ["${LANE_VISUAL_CAPTURE_DIR:-}", "{repo}", "{main}"],
+  "ignoreConsole": ["umami/script\\.js"],
+  "errorBoundaryText": ["Something went wrong!", "Page not found"],
+  "minTextCharsByRoute": { "/map": 80 },
+  "failOnHttpStatus": 400
+}
