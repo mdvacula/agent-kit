@@ -15,6 +15,15 @@ The full agentic loop this sits in:
 → tier → sync) → `/hub-drain` (workflow: implement → review → push) →
 `openspec-verify-change` + `/opsx:archive`.
 
+Running the workflows: the Workflow tool only loads a script from inside the
+repo's working directory, so copy `~/.claude/workflows/hub-drain.js` (and
+`hub-spec.js`) to **`<repo>/.claude/workflows/`** — that exact path, never the
+repo root or a `*.workflow.js` elsewhere — and make sure the repo's linters
+ignore `.claude/**`. (2026-10-20: a copy at `.claude/hub-drain.workflow.js` was
+picked up by newjerseybrews' `eslint .` — "'return' outside of function" — and
+turned the landing gate red.) The scripts resolve their helpers from
+`~/.claude/workflows/` by absolute path, so the copy needs nothing else.
+
 ## 1. Establish scope
 
 - `project` = the repo's directory name (e.g. `newjerseybrews`).

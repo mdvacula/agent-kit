@@ -23,6 +23,8 @@ cp -vL "$SRC"/workflows/* "$DST/workflows/"
 chmod +x "$DST"/workflows/*.sh
 cp -vL "$SRC"/scripts/*.py "$DST/scripts/"
 chmod +x "$DST"/scripts/*.py
+# lane-visual.mjs — the visual gate probe the worker protocol calls by path
+cp -vL "$SRC"/scripts/*.mjs "$DST/scripts/"
 
 echo "Installed. New sessions pick these up automatically."
 echo "Note: hub-drain.js resolves its helpers at \$SCRIPTS (default /home/mdv/.claude/workflows) — edit if your CLAUDE_CONFIG_DIR differs."

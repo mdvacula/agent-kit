@@ -37,10 +37,17 @@ claude/
 │   ├── hub-drain.js            ← parallel-lane drain: worker → review → fix cycles → rebase+ff-merge+push
 │   ├── hub-queue.py            ← computes a lane's runnable task set (deps + touches collision lock)
 │   ├── hub-lane-setup.sh       ← (re)create + reset a lane worktree, install deps, copy ignored inputs
-│   ├── hub-lane-merge.sh       ← land a reviewed lane: rebase onto main, ff-merge, push
-│   └── hub-lane-park.sh        ← keep unmerged lane commits on parked/<task>-<ts>, reset lane
+│   ├── hub-lane-merge.sh       ← land a reviewed lane: rebase onto the base branch, ff-merge, push
+│   ├── hub-lane-park.sh        ← keep unmerged lane commits on parked/<task>-<ts>, reset lane
+│   ├── hub-main-gate.sh        ← landing gate before push (repo hook / beatpath / generic); red = reset, park, exit 5
+│   ├── hub-tasks-union-ticks.py← resolves tasks.md tick-only conflicts during a land
+│   ├── measure-drain.py        ← per-agent metrics from subagent transcripts (runLog.metrics)
+│   └── graft-install.sh        ← pinned + patched graft CLI install
 ├── scripts/
-│   └── hub-cli.py              ← plain-HTTP hub client for sessions started without the MCP
+│   ├── hub-cli.py              ← plain-HTTP hub client for sessions started without the MCP
+│   └── lane-visual.mjs         ← the visual gate probe (see "Visual gate" below)
+├── docs/visual-gate/           ← design note + per-repo AGENTS.md snippets and .hub-visual.json files
+├── docs/main-gate/             ← per-repo landing-gate snippets (.hub-main-gate.sh)
 ├── memory/                     ← backup of the Claude Code auto-memory for this system (see README there)
 ├── plans/                      ← the plan-mode file the build started from
 ├── install.sh                  ← manual copy into ~/.claude (no symlinks, no automation)
@@ -48,8 +55,11 @@ claude/
 ```
 
 The `.sh`/`.py` entries under `claude/workflows/` and `claude/scripts/` are
-symlinks into `scripts/hub/`, which both generations share (`install.sh`
-copies real files).
+symlinks into `scripts/hub/` — the one real copy, which both generations share
+(`install.sh` copies real files). `hub-drain.js`, `hub-spec.js` and
+`lane-visual.mjs` are Claude-only and live directly in `claude/`. A repo can
+pin the branch lanes start from and land on with a one-line `.hub-base-branch`
+file at its root (newjerseybrews: `develop`); default `main`.
 
 Install: `./claude/install.sh`; restore the auto-memory for a project with
 `./claude/install-memory.sh ~/code` (Claude Code keys memory by the session's
@@ -155,6 +165,21 @@ cd ~/code/<project>
 npx -y @fission-ai/openspec@latest init --tools claude   # /opsx commands + openspec-* skills
 ```
 
+Running a workflow from a repo: the Workflow tool only loads a script from
+inside the repo's working directory, so copy `~/.claude/workflows/hub-drain.js`
+/ `hub-spec.js` to **`<repo>/.claude/workflows/`** and make the repo's linters
+ignore `.claude/**` (2026-10-20: a copy at `.claude/hub-drain.workflow.js` was
+linted by newjerseybrews' `eslint .` and turned the landing gate red). The
+scripts call their helpers from `~/.claude/workflows/` by absolute path.
+
+Per-repo hooks the lane scripts read from the repo root, all optional:
+`.hub-base-branch` (branch lanes start from and land on; default `main`),
+`.hub-main-gate.sh` (the landing gate; see below) and `.hub-visual.json`
+(the visual gate; see below). `hub-lane-setup.sh` also deletes
+`.next/types` / `.next/dev/types` (and `frontend/.next/…`) on every lane
+reset — they are gitignored, so `git clean` never removes them, and stale
+copies from an older Next fail `tsc --noEmit` on errors unrelated to the diff.
+
 Also add the repo's gate commands (`pnpm lint`, `pnpm type-check`, `pnpm test`,
 git basics) to `.claude/settings.json` permissions — workflow subagents inherit
 that allowlist, and anything not on it stalls a drain run on a permission
@@ -226,6 +251,56 @@ are recorded as `blocked` and skipped — they never end the run. Watch live via
 
 Pass workflow args as a real JSON object; both workflows tolerate stringified
 args through `normalizeArgs()` because the tool has delivered them as strings.
+
+### Landing gate (`hub-main-gate.sh`)
+
+After a lane is fast-forwarded onto the base branch and before the push,
+`hub-lane-merge.sh` runs `hub-main-gate.sh`; red (exit 5, `MAIN-GATE FAILED:
+<check>`) resets the branch and parks the lane. What it runs is resolved per
+repo: (1) `<repo>/.hub-main-gate.sh` if present, with `HUB_GATE_OLD`,
+`HUB_GATE_NEW`, `HUB_GATE_CHANGED` in the environment (newjerseybrews: lint,
+type-check, type-check:scripts on `.mts` changes, vitest — mirrors its CI);
+(2) else a beatpath-shaped tree (`packages/shared` + `frontend` + `convex`)
+gets the original beatpath checks; (3) else whichever of the `type-check`,
+`type-check:scripts`, `lint`, `test` package scripts exist. A changed
+lockfile triggers `pnpm install` first in every case.
+`HUB_GATE_DRY_RUN=1 hub-main-gate.sh <repo> <old-sha>` prints the resolved
+branch without running it. Snippets: `claude/docs/main-gate/`.
+
+### Visual gate (frontend tasks)
+
+For a diff that touches a page, the worker must show what it looks like:
+after the production build passes, `~/.claude/scripts/lane-visual.mjs` serves
+the lane's **own** Next.js standalone build on a per-lane loopback port,
+loads each route signed-out at iPhone 13 (390) and desktop (1440), checks
+hard invariants (horizontal overflow, error boundary, page error, thin page,
+no page inset at 390, plus opt-ins such as an HTTP error status) and writes
+`report.md`/`report.json` + fold/full JPEGs into
+`openspec/changes/<change>/evidence/<task-id>/`. Exit 1 on a hard invariant,
+2 when it cannot run. The worker commits the evidence; the reviewer opens
+every JPEG and fails a range with no evidence or a `FAIL` report. It never
+aims a browser at a LAN, beta or production host.
+
+The gate is per repo, in two places the repo owns:
+
+- **`.hub-visual.json`** at the repo root (like `.hub-base-branch`): how the
+  standalone server is found and started (app dir, server.js, port base, env
+  files and overrides), which host names map to loopback, which hosts are
+  denied, extra chromium args (SwiftShader for WebGL), error-page copy.
+  Every key is optional; without the file a repo with `frontend/` gets the
+  built-in beatpath profile, anything else gets defaults. `--print-config`
+  shows the resolved settings.
+- **A "Visual gate" section in the repo's `AGENTS.md`**: which paths trigger
+  it, the exact command, the routes to probe per area, env notes, and where
+  evidence goes. The agent rules (`hub-worker.md`, `hub-reviewer.md`) point
+  there instead of naming any repo's paths.
+
+**Add a repo:** check `output: "standalone"` and that a lane can build;
+write `.hub-visual.json` with a distinct `portBase` (beatpath 3100,
+newjerseybrews 3200); paste an AGENTS.md section modelled on
+`claude/docs/visual-gate/<repo>.md`; run it once on a lane build and open the
+JPEGs. Design note, option comparison and full key reference:
+[`claude/docs/visual-gate/README.md`](claude/docs/visual-gate/README.md).
 
 **5. Close the change**: `openspec-verify-change` to validate implementation
 against the artifacts, then `/opsx:archive`.
