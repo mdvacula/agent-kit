@@ -57,17 +57,22 @@ repo path, and possibly review findings to fix.
    vitest do not exercise Turbopack's module resolution, and a broken build
    blocks every deploy (2026-09-03: a `.js` specifier in packages/shared passed
    every other gate and broke `next build` on main for a day).**
-   **Visual gate (desktop AND mobile) — required when your diff touches
-   `frontend/src/app/`, `frontend/src/components/`, or a stylesheet/token the
-   pages read:** after `next build` passes, run the lane probe against YOUR
-   build (it serves your worktree's standalone build on a per-lane port —
-   never the LAN or beta hosts):
+   **Visual gate (desktop AND mobile) — required when your diff touches a
+   path the repo's AGENTS.md names for its visual gate** (its "Visual gate"
+   section lists the trigger paths, the exact command, the routes to probe
+   per area and where the evidence goes; a repo whose AGENTS.md names no
+   visual gate has none): after the repo's production build passes, run the
+   lane probe against YOUR build with the command that section gives (it
+   serves your worktree's standalone build on a per-lane port — never the
+   LAN or beta hosts):
 
        node ~/.claude/scripts/lane-visual.mjs --repo <your worktree> --lane <N> \
          --routes <every route your diff can change, comma-separated> \
          --out openspec/changes/<change>/evidence/<task-id>
 
-   `<N>` is your lane number (worktree `lane-N`). It writes fold + full
+   `<N>` is your lane number (worktree `lane-N`); the repo's
+   `.hub-visual.json` supplies its port base, server env and host rules —
+   never edit it to make a probe pass. It writes fold + full
    screenshots at iPhone 13 (390) and desktop (1440) per route plus
    `report.md`/`report.json`, and exits 1 on a hard invariant (horizontal
    overflow, route error boundary, page error, no page inset at 390, thin
@@ -78,8 +83,8 @@ repo path, and possibly review findings to fix.
    dock) were all visible in one glance at 390. **Commit the evidence
    directory** (JPEGs + report) with your code; it is the one sanctioned
    exception to the zero-bloat rule (each file ≤ 800 KB, the report lists
-   sizes). If the probe cannot run (no `.next/standalone`, port taken, Convex
-   unreachable) say so in the report — never skip it silently, never
+   sizes). If the probe cannot run (no `.next/standalone`, port taken, the
+   backend the page reads unreachable) say so in the report — never skip it silently, never
    substitute a unit test for it.
    Gates are tests, type-checks, lints, and
    read-only scripts — **a deploy is never a gate** (see Hard rules). If a
@@ -179,7 +184,9 @@ then report the blocker and stop. A precise blocker report is a successful run.
   names the owner-run step (2026-09-15: workers ran ad-hoc psql against the
   production DB to "check the data shape"). The one sanctioned live read is
   the visual gate: `lane-visual.mjs` serves YOUR build and lets the page's own
-  signed-out reads reach the box's Convex, exactly as a visitor's would. Never
-  point a browser at beatpath.local or beta.thebeatpath.com from a lane, and
-  never run `tools/capture`'s owner suite (it carries the owner's session).
+  signed-out reads reach the box backend the repo's AGENTS.md visual-gate
+  section names (read-only), exactly as a visitor's would. Never point a
+  browser at the repo's LAN, beta or production hosts from a lane (that
+  section names them), and never run an owner capture suite that carries the
+  owner's session.
 - Never commit secrets, .env files, or generated artifacts.

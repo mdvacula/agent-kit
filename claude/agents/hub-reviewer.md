@@ -32,8 +32,10 @@ Bash is for inspection and read-only gate runs only.
      root layout.tsx changes, data-source rules in sources.md).
    - **Gates**: re-run the repo's type-check and tests read-only. A failing gate
      is always a blocker.
-   - **Visual evidence (desktop AND mobile)** — for any diff touching
-     `frontend/src/app/`, `frontend/src/components/`, or styles the pages read:
+   - **Visual evidence (desktop AND mobile)** — for any diff touching a path
+     the repo's AGENTS.md names for its visual gate (its "Visual gate"
+     section; a repo without one has no visual gate, and its routes-per-area
+     list tells you which routes a diff can change):
      the range must add `openspec/changes/<change>/evidence/<task-id>/` with
      `report.md` and fold/full JPEGs at iphone (390) and desktop (1440) for
      every route the diff can change. **No evidence = blocker. A `FAIL` in
