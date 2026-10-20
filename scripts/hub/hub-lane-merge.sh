@@ -8,13 +8,25 @@
 # calls to this script across lanes; it never runs concurrently with itself.
 set -euo pipefail
 REPO="${1:?repo path}"; N="${2:?lane number}"
+# Landings from several drains share ONE main checkout: the main gate (tsc/vitest) read a file
+# that another lane's concurrent rebase+merge removed (2026-10-19, TS6053 on a file that existed).
+# Serialise every landing on the repo with a file lock.
+exec 9>"$REPO/.git/hub-lane-merge.lock"; flock 9
 BR="lane-$N"; WT="${REPO}-lanes/lane-$N"
+# Integration branch the lanes branch from and land on: the repo may pin it in
+# a .hub-base-branch file (newjerseybrews: develop — main is the protected
+# production branch, released by PR); default main.
+BASE="$( (cat "$REPO/.hub-base-branch" 2>/dev/null || true) | tr -d "[:space:]")"; BASE="${BASE:-main}"  # wrapped: pipefail + absent file aborted the script (2026-10-18)
 
 if [ -n "$(git -C "$REPO" status --porcelain | grep -v '^??' || true)" ]; then
   echo "DIRTY main checkout has tracked modifications; refusing to merge" >&2; exit 3
 fi
 
-OLD="$(git -C "$REPO" rev-parse --short main)"
+CUR="$(git -C "$REPO" rev-parse --abbrev-ref HEAD)"
+if [ "$CUR" != "$BASE" ]; then
+  echo "WRONG-BRANCH repo checkout is on $CUR, lanes land on $BASE; refusing to merge" >&2; exit 3
+fi
+OLD="$(git -C "$REPO" rev-parse --short "$BASE")"
 # A worker's stray UNTRACKED files (scratch copies, generated fixtures) make
 # `git rebase` refuse to check out main ("would be overwritten") — that is not
 # a conflict, and everything the task delivers is already committed. Drop
@@ -27,7 +39,7 @@ git -C "$WT" clean -fdq -e node_modules -e convex/_generated -e '.env.local' \
 # 2026-09-23 were exactly this. Any other conflicted file is a real conflict:
 # abort and park as before. Bounded so a runaway rebase cannot loop forever.
 GEN=packages/shared/src/convexFunctions.ts
-if ! git -C "$WT" rebase -q main >/dev/null 2>&1; then
+if ! git -C "$WT" rebase -q "$BASE" >/dev/null 2>&1; then
   for _step in 1 2 3 4 5 6 7 8 9 10; do
     CONF="$(git -C "$WT" diff --name-only --diff-filter=U || true)"
     if [ -z "$CONF" ]; then break; fi
@@ -82,7 +94,7 @@ GATE="$(dirname "$0")/hub-main-gate.sh"
 if [ -x "$GATE" ] && [ "${HUB_SKIP_MAIN_GATE:-0}" != 1 ]; then
   if ! GATE_OUT="$(bash "$GATE" "$REPO" "$OLD" 2>&1)"; then
     echo "$GATE_OUT" | tail -n 30 >&2
-    NEWSHA="$(git -C "$REPO" rev-parse --short main)"
+    NEWSHA="$(git -C "$REPO" rev-parse --short "$BASE")"
     git -C "$REPO" reset -q --hard "$OLD"
     echo "MAIN-GATE RED: main reset $NEWSHA -> $OLD; lane $BR still holds the rebased commits (park it)" >&2
     exit 5
@@ -91,11 +103,11 @@ if [ -x "$GATE" ] && [ "${HUB_SKIP_MAIN_GATE:-0}" != 1 ]; then
 fi
 
 for attempt in 1 2 3; do
-  if git -C "$REPO" push -q origin main; then
-    echo "MERGED $OLD..$(git -C "$REPO" rev-parse --short main)"; exit 0
+  if git -C "$REPO" push -q origin "$BASE"; then
+    echo "MERGED $OLD..$(git -C "$REPO" rev-parse --short "$BASE")"; exit 0
   fi
-  git -C "$REPO" pull -q --rebase origin main || { echo "PUSH-REBASE failed" >&2; exit 4; }
+  git -C "$REPO" pull -q --rebase origin "$BASE" || { echo "PUSH-REBASE failed" >&2; exit 4; }
   # keep the lane branch aligned with the rebased main
-  git -C "$WT" reset -q --hard main
+  git -C "$WT" reset -q --hard "$BASE"
 done
 echo "PUSH failed after 3 attempts" >&2; exit 4

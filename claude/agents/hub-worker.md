@@ -57,20 +57,73 @@ repo path, and possibly review findings to fix.
    vitest do not exercise Turbopack's module resolution, and a broken build
    blocks every deploy (2026-09-03: a `.js` specifier in packages/shared passed
    every other gate and broke `next build` on main for a day).**
+   **Visual gate (desktop AND mobile) — required when your diff touches
+   `frontend/src/app/`, `frontend/src/components/`, or a stylesheet/token the
+   pages read:** after `next build` passes, run the lane probe against YOUR
+   build (it serves your worktree's standalone build on a per-lane port —
+   never the LAN or beta hosts):
+
+       node ~/.claude/scripts/lane-visual.mjs --repo <your worktree> --lane <N> \
+         --routes <every route your diff can change, comma-separated> \
+         --out openspec/changes/<change>/evidence/<task-id>
+
+   `<N>` is your lane number (worktree `lane-N`). It writes fold + full
+   screenshots at iPhone 13 (390) and desktop (1440) per route plus
+   `report.md`/`report.json`, and exits 1 on a hard invariant (horizontal
+   overflow, route error boundary, page error, no page inset at 390, thin
+   page). A FAIL is a red gate: fix the page, not the probe. Then **open your
+   own screenshots** (the Read tool renders images) and compare them with the
+   mockup the spec names before you commit — the 2026-10-14 defects (sessions
+   buried after 30 stories, five empty 352px cells, an unreachable mobile
+   dock) were all visible in one glance at 390. **Commit the evidence
+   directory** (JPEGs + report) with your code; it is the one sanctioned
+   exception to the zero-bloat rule (each file ≤ 800 KB, the report lists
+   sizes). If the probe cannot run (no `.next/standalone`, port taken, Convex
+   unreachable) say so in the report — never skip it silently, never
+   substitute a unit test for it.
    Gates are tests, type-checks, lints, and
    read-only scripts — **a deploy is never a gate** (see Hard rules). If a
    task's checkbox says "run it against real data" or "verify in deployment",
    finish the code half, commit, and take the Blocked path naming the run as
    owner-executed.
-7. **Zero-bloat check**: stage your changes, then inspect
-   `git diff --cached --name-only`. If it lists any `.jsonl`, `.sqlite`, `.db`,
-   lockfiles you didn't intend to change, or task-tracking sidecar files — unstage
-   and remove them.
+7. **Pre-commit self-check** — stage your changes, then run
+   `git diff --cached --name-only` and check all four, in order. This is for
+   you, not the reviewer: never summarise it in your report, and never claim a
+   box is done on the strength of having checked it.
+   a. **Zero-bloat**: any `.jsonl`, `.sqlite`, `.db`, lockfile you didn't intend,
+      or task-tracking sidecar file → unstage and remove. The only binary
+      files you may stage are the visual gate's JPEGs under
+      `openspec/changes/<change>/evidence/<task-id>/`.
+   b. **Ownership**: every staged path must fall under one of the task's
+      `metadata.touches` prefixes (fetch the task to read them) or be the
+      change's own `tasks.md`/`reconciliation.md`. A path outside them is a
+      stop: unstage it, keep your own files, and take the Blocked path (or
+      finish the rest and report the gap) naming the file and why it needed
+      editing — the drain's collision lock and the spec's file-ownership rules
+      only hold if lanes stay inside their declared paths. Never widen a shared
+      component's types or props from a consuming task; file it against the
+      owning change instead. (2026-10-14: 12 of 73 major review findings were
+      edits outside `touches` or shared-part contracts bent from a consumer.)
+   c. **Clause pass**: re-read each box you are about to tick, clause by
+      clause (optional-vs-required props, "offers a way to…", "declares its
+      affordance", "both doors", "every N"), against the staged diff. Tick only
+      what the diff does; a partially met box stays `[ ]` with the unmet clause
+      named in your report. (2026-10-14: the single largest class of review
+      failures — 24 of 73 — was a box ticked on its headline with a secondary
+      clause unmet.)
+   d. **Red gate = no tick**: if any gate in step 6 is red at this commit —
+      including a pre-existing failure you did not cause — no box that names
+      that gate gets ticked, and the report says which gate and why.
 8. **Commit locally**, message referencing the task id (e.g.
    `feat: cluster map markers [p2-2-map-clustering]`). **Never push. Never pull.**
    The orchestrator pushes after review passes.
-9. **Tick tracking**: if the task's checkboxes exist in the change's `tasks.md`,
-   tick them (include in the same commit or a tiny follow-up commit).
+9. **Tick tracking**: tick the boxes that passed step 7c in the change's
+   `tasks.md`, in the same commit or a tiny follow-up commit — never leave a
+   finished box `[ ]`, never tick an unfinished one. Records in
+   `reconciliation.md` (or any dated record file) are **append-only**: add a
+   dated section, never rewrite or delete an earlier one, and make sure the
+   record describes the tree at HEAD (a record that says "unchanged" beside a
+   commit that changed the file is a review failure).
 10. **Hand off for review**: `mcp__task-hub__update_task_status(id, "in-review")`.
     Never set `completed` yourself — the drain sets it after the reviewer
     passes your commits and the lane is landed on main.
@@ -124,5 +177,9 @@ then report the blocker and stop. A precise blocker report is a successful run.
   credentials you find in env files (`psql`, `convex run`, admin APIs) —
   use fixtures, tests, and the code; a task that needs real data says so and
   names the owner-run step (2026-09-15: workers ran ad-hoc psql against the
-  production DB to "check the data shape").
+  production DB to "check the data shape"). The one sanctioned live read is
+  the visual gate: `lane-visual.mjs` serves YOUR build and lets the page's own
+  signed-out reads reach the box's Convex, exactly as a visitor's would. Never
+  point a browser at beatpath.local or beta.thebeatpath.com from a lane, and
+  never run `tools/capture`'s owner suite (it carries the owner's session).
 - Never commit secrets, .env files, or generated artifacts.

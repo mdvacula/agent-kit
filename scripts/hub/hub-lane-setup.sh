@@ -11,19 +11,25 @@
 set -euo pipefail
 REPO="${1:?repo path}"; N="${2:?lane number}"
 BR="lane-$N"; WT="${REPO}-lanes/lane-$N"
+# Integration branch the lanes branch from and land on: the repo may pin it in
+# a .hub-base-branch file (newjerseybrews: develop — main is the protected
+# production branch, released by PR); default main.
+# (cat may fail when the file is absent; with pipefail that would abort the script, so it is
+# wrapped — measured 2026-10-18: every lane setup exited 1 silently on a repo without the file.)
+BASE="$( (cat "$REPO/.hub-base-branch" 2>/dev/null || true) | tr -d "[:space:]")"; BASE="${BASE:-main}"
 mkdir -p "$(dirname "$WT")"
 
 git -C "$REPO" worktree prune >/dev/null 2>&1 || true
 if [ -d "$WT/.git" ] || [ -f "$WT/.git" ]; then
-  git -C "$WT" checkout -q -B "$BR" main
-  git -C "$WT" reset -q --hard main
+  git -C "$WT" checkout -q -B "$BR" "$BASE"
+  git -C "$WT" reset -q --hard "$BASE"
   # drop stray tracked-file edits/untracked source from a dead worker, but keep
   # the ignored scaffolding we copy below and node_modules
   git -C "$WT" clean -fdq -e node_modules -e convex/_generated -e '.env.local' \
     -e 'frontend/.env.local' -e 'worker/.env.local' -e 'frontend/next-env.d.ts' \
     -e graft -e .ignore
 else
-  git -C "$REPO" worktree add -q -B "$BR" "$WT" main
+  git -C "$REPO" worktree add -q -B "$BR" "$WT" "$BASE"
 fi
 
 # Gitignored inputs the gates need. Deploy/service secrets are deliberately NOT

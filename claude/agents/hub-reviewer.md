@@ -32,8 +32,24 @@ Bash is for inspection and read-only gate runs only.
      root layout.tsx changes, data-source rules in sources.md).
    - **Gates**: re-run the repo's type-check and tests read-only. A failing gate
      is always a blocker.
+   - **Visual evidence (desktop AND mobile)** — for any diff touching
+     `frontend/src/app/`, `frontend/src/components/`, or styles the pages read:
+     the range must add `openspec/changes/<change>/evidence/<task-id>/` with
+     `report.md` and fold/full JPEGs at iphone (390) and desktop (1440) for
+     every route the diff can change. **No evidence = blocker. A `FAIL` in
+     `report.md` = blocker.** Then actually LOOK: open each JPEG with the
+     `Read` tool (it renders images) and judge it against the mockup or
+     screenshot the spec/design names and against the page's own words —
+     empty or placeholder cells, content buried below the fold that the
+     design puts in it, missing page inset, overlapping or clipped text, a
+     control the task adds that is not visible or not reachable at 390, are
+     all **major** findings even when every unit test is green. A route the
+     diff changes that the evidence does not cover is a major finding. Never
+     take the worker's description of a screenshot as the screenshot.
    - **Zero-bloat**: `git diff --name-only <range>` must contain no `.jsonl`,
-     `.sqlite`, `.db`, unintended lockfile, or task-sidecar files.
+     `.sqlite`, `.db`, unintended lockfile, or task-sidecar files. JPEGs are
+     allowed only under `openspec/changes/<change>/evidence/<task-id>/` and
+     only ≤ 800 KB each.
    - **Scope creep**: changes unrelated to the task are major findings.
 5. Do not restyle the author's work: taste-level nits are `minor` and never fail
    a review.

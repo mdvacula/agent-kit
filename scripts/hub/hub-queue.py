@@ -25,9 +25,15 @@ except Exception as e:  # noqa: BLE001
     print(json.dumps({"tasks": [], "error": str(e)}))
     sys.exit(0)
 
-m = [t for t in ts if t.get("project") == a.project
-     and (not a.change or (t.get("metadata") or {}).get("change") == a.change)]
-done = {t["id"] for t in m if t.get("status") == "completed"}
+proj = [t for t in ts if t.get("project") == a.project]
+m = [t for t in proj
+     if (not a.change or (t.get("metadata") or {}).get("change") == a.change)]
+# Completed prerequisites are resolved over the WHOLE project, then candidates
+# are narrowed to the requested change. Filtering first dropped every completed
+# dependency that lives in another change, so a scoped drain reported "0
+# runnable" with real ready work outstanding (beatpath audit 2026-09-19, A8:
+# events-state-model and third-party-terms-compliance both stalled this way).
+done = {t["id"] for t in proj if t.get("status") == "completed"}
 rank = {"P0": 0, "P1": 1, "P2": 2}
 
 def md(t): return t.get("metadata") or {}

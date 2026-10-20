@@ -28,7 +28,8 @@ const repo = A.repo || `/home/mdv/code/${project}`
 const change = A.change
 const maxTasks = A.maxTasks || 1000
 const LANES = Math.max(1, Math.min(6, A.lanes || 3))
-const OFFSET = Math.max(0, A.laneOffset || 0) // lane numbers start at OFFSET+1 so two drains can run side by side
+const OFFSET = Math.max(0, A.laneOffset || 0)
+const ONLY = Array.isArray(A.only) ? new Set(A.only) : null // optional: pin the run to these task ids // lane numbers start at OFFSET+1 so two drains can run side by side
 
 const HUB = 'http://127.0.0.1:8050'
 const SCRIPTS = '/home/mdv/.claude/workflows'
@@ -105,7 +106,7 @@ async function fetchRunnable(laneLabel) {
   // One plain command, no inline quoting: the script computes the runnable set
   // and the agent copies its stdout. A flaky inline python -c once returned
   // {tasks: []} for a lane at startup and retired it with 17 tasks runnable.
-  const cmd = `python3 ${SCRIPTS}/hub-queue.py --project ${project}${change ? ` --change ${change}` : ''} --hub ${HUB}`
+  const cmd = `python3 ${SCRIPTS}/hub-queue.py --project ${project}${change ? ` --change ${change}` : ''} --hub ${HUB}${ONLY ? " --limit 200" : ""}`
   const r = await agent(
     `Run EXACTLY this command and return its stdout as your JSON result, unchanged:\n${cmd}\n` +
     `Rules: do NOT retype, summarize, invent, rename, or infer any task. Ids must be copied byte-for-byte. ` +
@@ -154,6 +155,7 @@ function conflicts(t) {
 function pickFor(rows) {
   for (const t of rows) {
     if (claimed.has(t.id)) continue
+    if (ONLY && !ONLY.has(t.id)) continue
     if (conflicts(t)) continue
     return t
   }
@@ -230,6 +232,30 @@ async function runTask(task, n, wt) {
   // Owner-gated stop: review any code half, land it if it passes, keep draining.
   if (worker.outcome === 'blocked') {
     log(`⏸ ${lane} ${task.id} blocked: ${(worker.blockReason || worker.summary || '').slice(0, 160)}`)
+    // Never trust the worker's self-reported range on the blocked path: ask git
+    // whether the lane is ahead of main (2026-09-05: a worker committed and
+    // reported null; 2026-09-30: workers reported "x..x" EMPTY ranges, the
+    // ff-merge of nothing "succeeded", and the drain marked two Phase-3 groups
+    // completed with zero code — every dependent then read a phantom).
+    const ahead = await sh(`git -C ${wt} rev-parse --short $(cat ${repo}/.hub-base-branch 2>/dev/null || echo main) HEAD`, `ahead:${task.id}`, 'Review')
+    const [base, head] = (ahead.output || '').trim().split(/\s+/)
+    if (ahead.ok && base && head && base === head) {
+      if (worker.commitRange) log(`  ${lane} ${task.id} reported ${worker.commitRange} but is NOT ahead of main — treating as no code`)
+      worker.commitRange = null
+    } else if (ahead.ok && base && head && !worker.commitRange) {
+      worker.commitRange = `${base}..${head}`
+      log(`  ${lane} ${task.id} reported no commitRange but is ahead of main — using ${worker.commitRange}`)
+    }
+    // A block with NO code is a stop-and-report (a re-scope, a design defect, a
+    // missing artefact) — never an owner-run remainder. Record it on the task
+    // itself, leave it blocked, spawn nothing (2026-09-30: four phantom
+    // "-owner-run" children carried real planner decisions nobody was reading).
+    if (!worker.commitRange) {
+      await agent(`Job C: mark task ${task.id} blocked. Reason: STOP-AND-REPORT (no code committed): ${(worker.blockReason || worker.summary || '').slice(0, 1500)}`,
+        { agentType: 'hub-steward', phase: 'Land', label: `block-noop:${task.id}` })
+      blocked.push({ id: task.id, lane, reason: worker.blockReason || worker.summary, commitRange: null, verdict: null, findings: [], landed: null })
+      return
+    }
     let v = null
     if (worker.commitRange) {
       v = await agent(
