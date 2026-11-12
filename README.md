@@ -165,12 +165,13 @@ cd ~/code/<project>
 npx -y @fission-ai/openspec@latest init --tools claude   # /opsx commands + openspec-* skills
 ```
 
-Running a workflow from a repo: the Workflow tool only loads a script from
-inside the repo's working directory, so copy `~/.claude/workflows/hub-drain.js`
-/ `hub-spec.js` to **`<repo>/.claude/workflows/`** and make the repo's linters
-ignore `.claude/**` (2026-10-20: a copy at `.claude/hub-drain.workflow.js` was
-linted by newjerseybrews' `eslint .` and turned the landing gate red). The
-scripts call their helpers from `~/.claude/workflows/` by absolute path.
+Running a workflow from a repo: `install.sh` puts `hub-drain.js` and
+`hub-spec.js` in `~/.claude/workflows/`, where Claude Code loads them as
+personal workflows available in every project, so run them by name. A repo
+needs no copy. Delete any old copy under `<repo>/.claude/workflows/`: a project
+workflow takes precedence over a personal one with the same name, so a stale
+copy runs in place of the current script. The scripts call their helpers from
+`~/.claude/workflows/` by absolute path.
 
 Per-repo hooks the lane scripts read from the repo root, all optional:
 `.hub-base-branch` (branch lanes start from and land on; default `main`),
