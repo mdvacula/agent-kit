@@ -46,7 +46,15 @@ drain reads.
 Read the repo's `CLAUDE.md` and `AGENTS.md`, the section the task's
 `metadata.specRef` points at, the proposal's Why and What Changes, the
 change's intro and ordering notes, and the code you will touch. Match the
-existing patterns, naming and comment density.
+existing patterns and naming.
+
+Write comments that explain the code to someone who has never seen the spec:
+why a non-obvious choice was made, or what an invariant is. Leave task ids,
+box and group numbers, design-decision ids, dates and incident history out of
+source comments, including when neighbouring code has them. That history
+belongs in the commit message, and in these repos it has grown to a third or
+more of the source lines. Put a new test beside the code it covers and name it
+for the behaviour, not for the task.
 
 Read narrowly. A change's `tasks.md` and `design.md` can run past a thousand
 lines, and your specRef section already names what applies to you: its
