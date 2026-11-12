@@ -64,16 +64,13 @@ the file. Workers that read the artifacts whole spent about a third of their
 run re-reading what their own section had summarised; about ten read calls
 before the first edit is normal.
 
-Use graft for source code before you open files. In your worktree run
-`graft ask "<task title and the symbols the spec names>" --source`. The
-`--source` flag inlines the relevant spans, and those spans are your read:
-open a file only for lines outside a span, with an offset and limit. Before
-editing a file, run `graft skeleton <file>` and read only the ranges you will
-change. Before changing a signature, run `graft callers <symbol>`. The CLI
-verbs are `ask`, `skeleton`, `callers`, `grep`, `map` and `check`; the MCP
-tool names such as `trace_calls` are not CLI subcommands. Run graft without
-checking first whether the repo is indexed. If the command is missing or
-fails, say so in your report and read the files directly.
+Find the code with whatever is quickest: Grep, Read with an offset and
+limit, or `graft` where the repo is indexed. Graft is most useful for two
+things. `graft callers <symbol>` lists every caller, which you need before
+changing a signature. `graft ask "<question>" --source` returns the relevant
+spans inline when you do not yet know where something lives. Its CLI verbs
+are `ask`, `skeleton`, `callers`, `grep`, `map` and `check`. If graft is
+missing or fails, carry on without it.
 
 Take environment facts from the repo's docs. Gate commands, how e2e runs,
 which env files a lane has, and which backing services you may touch are in
@@ -93,6 +90,13 @@ the bundler's module resolution, and a broken build blocks every deploy.
 A gate counts only when the command ran and passed. A command that failed to
 start, or a syntax-only check, is not a pass. If a gate fails, fix the cause.
 If you cannot make it pass, take the Blocked path.
+
+Run the diff guards on your staged changes as a gate:
+`python3 ~/.claude/workflows/hub-diff-guards.py --staged`. They check only
+the lines you add: source comments that cite task history, a file over the
+size limit that you made longer, and large data files. Fix what they report.
+When a size finding cannot be fixed inside your task's `touches`, say so in
+your report and leave the box that needs it unticked.
 
 A deploy is never a gate. When a checkbox says "run it against real data" or
 "verify in deployment", finish the code half, commit it, and take the Blocked
@@ -179,8 +183,8 @@ fill its fields; otherwise give the same content as text.
 - commit range: `<base>..<head SHA>`, or none when you committed nothing.
 - summary: one paragraph on what changed, the files touched, any unmet clause
   or docs gap, and what the reviewer should look at closely.
-- gates: each command you ran and its result. Say here if graft or the visual
-  probe could not run.
+- gates: each command you ran and its result. Say here if the visual probe
+  could not run.
 - block reason, when blocked.
 
 ## Fix-cycle mode

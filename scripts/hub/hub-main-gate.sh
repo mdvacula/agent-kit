@@ -19,7 +19,8 @@
 #   3. else the generic pnpm fallback: whichever of the package.json scripts
 #      type-check, type-check:scripts, lint, test exist, in that order (CI=1
 #      so a watch-mode test runner exits).
-# The lockfile-changed `pnpm install` runs before all three.
+# The lockfile-changed `pnpm install` runs before all three, and so does
+# hub-diff-guards.py in warn-only mode.
 #
 # Why the resolution: until 2026-10-20 the beatpath checks ran for every repo,
 # and the newjerseybrews drain that day had five PASS reviews and zero
@@ -59,6 +60,15 @@ if [ "$DRY" = 1 ]; then
     echo "── main-gate (dry): branch C — generic pnpm scripts:${found:- (none)}"
   fi
   rm -f "$LOG"; echo "MAIN-GATE OK $OLD..$NEW (dry run)"; exit 0
+fi
+
+# Growth guards, warn only: the reviewer already fails a lane on these, so a
+# line here means a landing got past review with one. It never turns the gate
+# red; the lines land in the drain log for the owner to read.
+GUARDS="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/hub-diff-guards.py"
+if [ -f "$GUARDS" ]; then
+  step "diff guards (warn only)"
+  python3 "$GUARDS" "$OLD..HEAD" --warn || true
 fi
 
 # 0. dependencies (every branch) — only when the lockfile moved (pnpm install is idempotent

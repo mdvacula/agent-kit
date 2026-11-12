@@ -298,12 +298,14 @@ async function runTask(task, n, wt) {
   // Review with up to two fix cycles; cycle 2 bumps the tier.
   let verdict = null
   let cycles = 0
+  const reviews = [] // every review of this task, so the hub keeps what the reviewer caught on the way to PASS
   for (;;) {
     verdict = await agent(
       `Review task ${task.id} in ${wt}, commit range: ${worker.commitRange}.`,
       { agentType: 'hub-reviewer', phase: 'Review', label: `review:${task.id}`, schema: VERDICT_SCHEMA },
     )
     if (!verdict) { log(`✗ reviewer died on ${task.id}`); return }
+    reviews.push({ cycle: cycles, tier: currentTier, verdict: verdict.verdict, findings: verdict.findings })
     if (verdict.verdict === 'PASS') break
     if (cycles >= 2) {
       const reason = `Failed review after ${cycles} fix cycles. Findings: ` +
@@ -339,7 +341,7 @@ async function runTask(task, n, wt) {
     `Job A: record a runLog entry on task ${task.id}${landed ? ` — the task IS landed (${landed}); after the runLog, set its status to completed` : ' — NOT landed; leave the status alone'}. Entry JSON: ` +
     JSON.stringify({ agent: TIER_AGENT[currentTier], tier: currentTier, lane, commitRange: worker.commitRange,
       gates: worker.gates, verdict: verdict.verdict, findingsCount: verdict.findings.length,
-      fixCycles: cycles, summary: worker.summary, landed, metrics }),
+      fixCycles: cycles, reviews, summary: worker.summary, landed, metrics }),
     { agentType: 'hub-steward', phase: 'Land', label: `runlog:${task.id}` },
   )
   completed.push({ id: task.id, lane, commitRange: worker.commitRange, fixCycles: cycles, landed })

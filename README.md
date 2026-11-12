@@ -40,6 +40,7 @@ claude/
 │   ├── hub-lane-merge.sh       ← land a reviewed lane: rebase onto the base branch, ff-merge, push
 │   ├── hub-lane-park.sh        ← keep unmerged lane commits on parked/<task>-<ts>, reset lane
 │   ├── hub-main-gate.sh        ← landing gate before push (repo hook / beatpath / generic); red = reset, park, exit 5
+│   ├── hub-diff-guards.py      ← growth guards on what a diff adds (history comments, file size, data files)
 │   ├── hub-tasks-union-ticks.py← resolves tasks.md tick-only conflicts during a land
 │   ├── measure-drain.py        ← per-agent metrics from subagent transcripts (runLog.metrics)
 │   └── graft-install.sh        ← pinned + patched graft CLI install
@@ -238,8 +239,9 @@ and never mark `completed`. An Opus reviewer inspects the commit range
 against the spec and re-runs gates; on FAIL the findings go to a fresh worker
 for a fix cycle (max 2, second one bumps the tier). After PASS the lane is landed with
 `hub-lane-merge.sh` (rebase onto main, ff-merge, push — serialised across
-lanes) and a steward records the `runLog` entry — verdict, fix cycles, landed
-range, and per-agent `metrics` (reads, graft calls, tokens, wall time measured
+lanes) and a steward records the `runLog` entry — verdict, fix cycles, every
+review's findings (`reviews`, so what the reviewer caught on the way to PASS
+is kept), landed range, and per-agent `metrics` (reads, graft calls, tokens, wall time measured
 from the subagent transcripts by `scripts/hub/measure-drain.py`) — and only
 then sets `completed`, so `completed` means "on main" and `blockedBy` never
 releases a dependent early. The hub UI's Metrics screen (`/ui/#metrics`)
@@ -315,6 +317,23 @@ end for the main session to offer retry / skip / investigate.
 Relaunching the drain is idempotent: completed tasks aren't refetched.
 `/hub-status` also flags stale claims (`in-progress` >2 h — usually a dead
 run; reset to `pending` after confirming).
+
+### Growth guards (`hub-diff-guards.py`)
+
+Agent-written repos grow in three ways that no test catches: source comments
+that retell task history, files that keep getting longer, and result data
+committed beside code. `hub-diff-guards.py` checks only the lines a diff adds,
+so existing code is never flagged and each landing is held to the rule from
+then on. It runs in three places: the worker runs it on the staged diff as a
+gate, the reviewer runs it on the commit range and fails the review on any
+line, and `hub-main-gate.sh` runs it warn-only at landing. Per-repo limits,
+exclusions and patterns go in `<repo>/.hub-guards.json`; the script's header
+lists the keys. Try it on any range: `hub-diff-guards.py HEAD~20..HEAD --warn`.
+
+The planner covers what a diff check cannot: `hub-plan` and `hub-spec` give
+every flag, second version, shadow mode and dry-run cron a `REMOVE:` task, ask
+for a lifecycle header on one-off scripts, and keep a standing `janitor`
+change per repo for removal work.
 
 ### Model tiers
 

@@ -93,6 +93,18 @@ are working on. The plan decides how much of that width is usable:
   `blocked`, the exact commands or the proposed default in `notes`, blocking
   only what truly depends on it. Keep such a box out of agent tasks: workers
   may not deploy or touch live state, so they stop on it.
+- **Everything temporary gets its removal task now.** When a task adds a
+  feature flag, a second version of a page or component beside the first, a
+  shadow mode, or a cron that starts in dry-run, sync a second task in the
+  same change titled `REMOVE:` that deletes the old side and the switch. It
+  is `blockedBy` the task that adds the new side. If the removal waits on an
+  owner decision (the flag flip), give it status `blocked` with that decision
+  and a review date in `notes`. Without this task nothing ever deletes the
+  old side: workers may not touch code outside their task.
+- **One-off scripts carry a lifecycle header.** A task that adds a backfill,
+  migration, probe or measurement script says so in its title, and its spec
+  asks for a header comment with the kind (`one-off`, `harness` or
+  `runbook`), and for a one-off the date after which it can be archived.
 - **External gates** (a box that waits on another change) also sync as
   `blocked` with the gate named in `notes`, never as runnable `pending`.
 
@@ -143,7 +155,16 @@ was registered, or MCP never attached to this lineage), fall back in order:
    (also `sync`, `fetch`, `set-status`, `status`). Same write path and
    validation as MCP, so there is no need to hand-write curl JSON-RPC.
 
-## 6. Report
+## 6. Keep a janitor change
+
+Each repo keeps one standing change named `janitor` for removal work that
+belongs to no feature: retiring a dead generation, archiving one-off scripts
+past their date, merging re-written helpers, deleting unreferenced code. When
+an audit, a reviewer note or `hub-diff-guards.py` turns up such work, add it
+there as a small task with tight `touches`. Give every drain a few of them:
+removal only happens when it is in the queue.
+
+## 7. Report
 
 Counts by priority/tier, the dependency roots (tasks runnable immediately), and
 the suggested next step: `/hub-drain` with `{project, change, maxTasks: 3}` for

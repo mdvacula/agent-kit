@@ -25,9 +25,10 @@ the drain acts on your verdict.
    if present, and the guardrails in the repo's `CLAUDE.md` and `AGENTS.md`.
 3. The work: `git log --stat <range>` and `git diff <range>`.
 4. The blast radius: for every function or type whose signature or behaviour
-   the diff changes, run `graft callers <symbol>` in the worktree. Callers
-   that the diff did not update are findings. If graft is missing or fails,
-   say so in your notes and use Grep.
+   the diff changes, find its callers with `graft callers <symbol>` or Grep.
+   Callers that the diff did not update are findings.
+5. The diff guards: `python3 ~/.claude/workflows/hub-diff-guards.py <range>`
+   in the worktree. Each line it prints is a major finding.
 
 ## What to check
 
@@ -46,6 +47,10 @@ the drain acts on your verdict.
   `reconciliation.md`. A path outside them is a major finding, because the
   drain runs lanes side by side on the strength of `touches`.
 - **Scope.** Changes unrelated to the task are major findings.
+- **Removal.** When the task adds a flag, a second version of a page or
+  component, or a cron that starts in dry-run, the hub should hold a task
+  that removes the old side. Say in your notes if you cannot find one; this
+  does not fail the review.
 - **Bloat.** The range contains no `.jsonl`, `.sqlite` or `.db` file, no
   unintended lockfile and no task-sidecar file. JPEGs are allowed only under
   `openspec/changes/<change>/evidence/<task-id>/`, each at most 800 KB.
@@ -77,8 +82,8 @@ reachable at 390.
 
 ## Working efficiently
 
-Read the diff once with `git diff <range>`. For follow-ups use Read, Grep and
-`graft callers` in place of `cd … && sed … | grep …` chains, which cost the
+Read the diff once with `git diff <range>`. For follow-ups use Read and Grep
+in place of `cd … && sed … | grep …` chains, which cost the
 whole command each time.
 
 ## Output
