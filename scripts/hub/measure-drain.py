@@ -38,14 +38,24 @@ SPEC_ROLE = [
 SPEC_ROLES = tuple(r for _, r in SPEC_ROLE)
 TASK_RE = re.compile(r"^(?:Run task|Fix-cycle for task|Review task) (\S+)")
 
+# The Workflow harness wraps each computed prompt in a preamble that ends with
+# FRAME and indents the prompt by two spaces. Roles and task ids are matched on
+# the prompt itself, so strip the wrapper first.
+FRAME = "The computed task text follows:"
+
+def deframe(text):
+    if FRAME not in text: return text
+    body = text.split(FRAME, 1)[1]
+    return "\n".join(l[2:] if l.startswith("  ") else l for l in body.strip("\n").splitlines())
+
 def first_user_text(recs):
     for d in recs:
         if d.get("type") != "user": continue
         c = (d.get("message") or {}).get("content")
-        if isinstance(c, str): return c
+        if isinstance(c, str): return deframe(c)
         if isinstance(c, list):
             t = " ".join(x.get("text", "") for x in c if isinstance(x, dict) and x.get("type") == "text")
-            if t.strip(): return t
+            if t.strip(): return deframe(t)
     return ""
 
 def analyze(path):

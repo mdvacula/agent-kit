@@ -28,7 +28,7 @@ claude/
 │   ├── hub-worker-haiku.md     ← mechanical-task tier
 │   ├── hub-worker-opus.md      ← hard-task tier
 │   ├── hub-reviewer.md         ← opus, read-only, VERDICT: PASS|FAIL
-│   └── hub-steward.md          ← haiku utility: runLog entries, lane git ops
+│   └── hub-steward.md          ← haiku utility: runLog entries, blocked/completed status, task sync
 ├── skills/
 │   ├── hub-plan/               ← reconciliation audit → chunk → tier → touches → sync to hub
 │   └── hub-status/             ← queue overview, blocked reasons, stale claims
@@ -317,21 +317,38 @@ run; reset to `pending` after confirming).
 
 ### Model tiers
 
-| Tier | Worker | Gets |
-|---|---|---|
-| `haiku` | hub-worker-haiku | mechanical, fully-specified, ≤2 files, no new tests |
-| `sonnet` | hub-worker | the default: features, tests, pattern-following multi-file work |
-| `opus` | hub-worker-opus | schema/migrations, algorithmic logic, auth/security, concurrency, ambiguity |
+| Tier | Worker | Effort | Gets |
+|---|---|---|---|
+| `haiku` | hub-worker-haiku | medium | mechanical, fully-specified, ≤2 files, no new tests |
+| `sonnet` | hub-worker | medium | the default: features, tests, pattern-following multi-file work |
+| `opus` | hub-worker-opus | high | schema/migrations, algorithmic logic, auth/security, concurrency, ambiguity |
 
-Reviews are always Opus. Escalation only bumps tiers up, never down. The
-planner assigns `metadata.tier`; override it in the hub when you disagree.
+Reviews are always Opus, at high effort; the steward runs Haiku at low.
+Escalation only bumps tiers up, never down. The planner assigns
+`metadata.tier`; override it in the hub when you disagree.
+
+Each agent sets `effort` in its frontmatter, and `hub-spec.js` sets it per
+call, so a run costs the same whatever effort the launching session uses. To
+re-tune a level, change it in one place and compare pass-first rate, fix
+cycles and tokens in `measure-drain.py` or the hub's `/ui/#metrics`.
+
+The agent prompts were re-written on 2026-11-11 against Anthropic's prompting
+guidance for the Claude 5 models: plain wording, each rule with its reason,
+output formats that defer to the workflow's schemas. Three things other tools
+depend on, so check them when you edit a prompt: `wf-watch.py` and
+`measure-drain.py` match the opening words of the drain's prompts ("Run task",
+"Fix-cycle for task", "Review task", "Job X", "split an owner-run remainder
+off task"), and the drain's schemas define the fields the worker and reviewer
+return.
 
 ---
 
 ## OpenCode generation (current)
 
 The same loop for [OpenCode](https://opencode.ai/docs), built from the
-Claude Code one. Roles, prompts, tiers, review gate and lane scripts are the
+Claude Code one. The OpenCode agent prompts were not part of the 2026-11-11
+rewrite: they still carry the earlier wording and target Sonnet 5, Opus 5 and
+Haiku 4.5. Roles, prompts, tiers, review gate and lane scripts are the
 same; the differences are mechanical:
 
 - OpenCode has no Workflow tool, so `/hub-drain` and `/hub-spec` are

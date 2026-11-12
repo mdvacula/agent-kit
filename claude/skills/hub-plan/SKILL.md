@@ -17,12 +17,11 @@ The full agentic loop this sits in:
 
 Running the workflows: the Workflow tool only loads a script from inside the
 repo's working directory, so copy `~/.claude/workflows/hub-drain.js` (and
-`hub-spec.js`) to **`<repo>/.claude/workflows/`** — that exact path, never the
-repo root or a `*.workflow.js` elsewhere — and make sure the repo's linters
-ignore `.claude/**`. (2026-10-20: a copy at `.claude/hub-drain.workflow.js` was
-picked up by newjerseybrews' `eslint .` — "'return' outside of function" — and
-turned the landing gate red.) The scripts resolve their helpers from
-`~/.claude/workflows/` by absolute path, so the copy needs nothing else.
+`hub-spec.js`) to `<repo>/.claude/workflows/`. Use that exact path and make
+sure the repo's linters ignore `.claude/**`: a copy anywhere else gets linted
+as project code, fails on its top-level `return`, and turns the landing gate
+red. The scripts resolve their helpers from `~/.claude/workflows/` by absolute
+path, so the copy needs nothing else.
 
 ## 1. Establish scope
 
@@ -37,7 +36,7 @@ turned the landing gate red.) The scripts resolve their helpers from
 - If `/hub-spec` just ran, read its returned critique — open blockers must be
   resolved with the user before syncing anything.
 
-## 2. Reconciliation audit — MANDATORY, before any sync
+## 2. Reconciliation audit, before any sync
 
 tasks.md files rot. For each item in the change's `tasks.md`, check it against
 the actual codebase and any superseding docs (roadmaps, source-policy docs,
@@ -50,18 +49,23 @@ newer changes). Classify every item:
   reason. Do not sync.
 - **todo** — genuinely remaining work. This is what gets synced.
 
-Present the audit summary (counts + notable obsoletes) to the user BEFORE
-syncing. This step regularly rewrites half the plan — do not skip it.
+Present the audit summary (counts and notable obsoletes) to the user before
+syncing anything. This step regularly rewrites half the plan, which is why it
+comes first and is never skipped.
+
+For a big change you can fan the audit out: one Explore agent per `tasks.md`
+section, each classifying its items against the codebase, then merge.
 
 ## 3. Chunk into hub tasks
 
-- One hub task per coherent subsection / 3–8 related checkboxes. NEVER one hub
-  task per checkbox. Target 8–20 hub tasks per change.
+- One hub task per coherent subsection of 3–8 related checkboxes, which gives
+  about 8–20 hub tasks per change. A task per checkbox is too fine: each task
+  costs a worker run and a review.
 - Each task must be independently implementable and reviewable: a worker gets
   only the task + specRef, so the title and spec section must carry the intent.
 - Model dependencies with `blockedBy`/`blocks` (task IDs), not ordering hopes.
 
-### Plan for parallel lanes (added 2026-09-03)
+### Plan for parallel lanes
 
 `/hub-drain` runs several lanes at once, each in its own git worktree. A lane
 takes the next runnable task whose files do not collide with what other lanes
@@ -69,7 +73,7 @@ are working on. The plan decides how much of that width is usable:
 
 - **`blockedBy` is a data dependency, nothing else.** Add an edge only when a
   task reads code, schema, or an artifact that another task writes. "Safer to
-  do after", "same subsystem", "review them together" are NOT edges — they
+  do after", "same subsystem" and "review them together" are not edges: they
   serialize a lane for no reason. If the spec's ordering notes say two groups
   "must land together", ask whether that is true at the file level; usually
   one direction of dependency is real and the other is habit.
@@ -89,8 +93,8 @@ are working on. The plan decides how much of that width is usable:
   against a live backend or database, a hands-on check, or a sign-off becomes
   a separate task titled `OWNER OPS:` or `OWNER DECISION:` with status
   `blocked`, the exact commands or the proposed default in `notes`, blocking
-  only what truly depends on it. Never fold such a box into an agent task —
-  workers may not deploy or touch live state and will stop on it.
+  only what truly depends on it. Keep such a box out of agent tasks: workers
+  may not deploy or touch live state, so they stop on it.
 - **External gates** (a box that waits on another change) also sync as
   `blocked` with the gate named in `notes`, never as runnable `pending`.
 
@@ -139,9 +143,7 @@ was registered, or MCP never attached to this lineage), fall back in order:
 2. `~/.claude/scripts/hub-cli.py` — a plain-HTTP MCP client for the hub:
    `echo '<tasks JSON array>' | python3 ~/.claude/scripts/hub-cli.py sync-batch --project <p>`
    (also `sync`, `fetch`, `set-status`, `status`). Same write path and
-   validation as MCP; never hand-roll curl JSON-RPC. For big changes you can also
-fan the §2 audit out: one Explore agent per tasks.md section, each classifying
-its items against the codebase, then merge.
+   validation as MCP, so there is no need to hand-write curl JSON-RPC.
 
 ## 6. Report
 

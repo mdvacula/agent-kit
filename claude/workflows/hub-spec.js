@@ -40,20 +40,20 @@ const [codeMap, conventions, constraints] = await parallel([
     `In ${repo}: map the code most relevant to this idea: "${idea}". ${graftHint}` +
     `Report: key files/modules with paths, patterns and utilities that should be reused, ` +
     `any existing partial implementation of this idea, and the test setup. ` +
-    `Concise structured brief — you are feeding a design agent, not a human.`,
-    { model: 'sonnet', phase: 'Explore', label: 'code-map' }),
+    `Write a concise structured brief; its reader is a design agent, not a person.`,
+    { model: 'sonnet', effort: 'medium', phase: 'Explore', label: 'code-map' }),
   () => agent(
     `In ${repo}: read openspec/project.md, openspec/config.yaml (note the schema and any custom rules), ` +
     `the specs/ directory, and the active openspec/changes/. Also read CLAUDE.md and AGENTS.md. ` +
     `Report: the exact artifact conventions a new change must follow (file set, formats, checkbox style), ` +
     `which existing specs/changes overlap with: "${idea}", and the repo guardrails that bind implementation. ` +
     `Include the list of existing change IDs so a new ID can avoid collisions.`,
-    { model: 'sonnet', phase: 'Explore', label: 'spec-conventions' }),
+    { model: 'sonnet', effort: 'medium', phase: 'Explore', label: 'spec-conventions' }),
   () => agent(
     `In ${repo}: hunt for constraints and superseding decisions relevant to "${idea}": ` +
     `roadmap/backlog docs, ADRs, policy docs (e.g. data-source rules), recent commits that changed direction. ` +
-    `Report what must NOT be done and why, with file references. If nothing constrains the idea, say so explicitly.`,
-    { model: 'sonnet', phase: 'Explore', label: 'constraints' }),
+    `Report what is ruled out and why, with file references. If nothing constrains the idea, say so explicitly.`,
+    { model: 'sonnet', effort: 'medium', phase: 'Explore', label: 'constraints' }),
 ])
 if (!codeMap || !conventions) return { stopped: 'explore-failed', haveCodeMap: !!codeMap, haveConventions: !!conventions }
 const context = `## Code map\n${codeMap}\n\n## Spec conventions & overlaps\n${conventions}\n\n## Constraints\n${constraints || 'none found'}`
@@ -68,8 +68,8 @@ const LENSES = [
 const approaches = (await parallel(LENSES.map(([name, lens]) => () => agent(
   `Design an implementation approach for "${idea}" in ${repo} strictly through this lens: ${lens}.\n\n${context}\n\n` +
   `Return: approach summary, key technical decisions with rationale, main risks, and a rough ordered task list. ` +
-  `Stay honest to your lens even if it has costs — a judge will compare approaches.`,
-  { model: 'sonnet', phase: 'Approaches', label: `approach:${name}` }),
+  `Stay with your lens even where it has costs, and name those costs: a judge compares the three approaches.`,
+  { model: 'sonnet', effort: 'medium', phase: 'Approaches', label: `approach:${name}` }),
 ))).filter(Boolean)
 if (approaches.length === 0) return { stopped: 'no-approaches' }
 
@@ -79,7 +79,7 @@ const judgment = await agent(
   `\n\n${context}\n\nPick the winner for THIS repo at ITS current stage, then graft in the best individual ideas ` +
   `from the losers. Return {winner, rationale, synthesis} where synthesis is the full merged approach a spec ` +
   `author can draft from without reading the originals.`,
-  { model: 'opus', phase: 'Approaches', label: 'judge',
+  { model: 'opus', effort: 'high', phase: 'Approaches', label: 'judge',
     schema: { type: 'object', required: ['winner', 'rationale', 'synthesis'],
       properties: { winner: { type: 'string' }, rationale: { type: 'string' }, synthesis: { type: 'string' } } } },
 )
@@ -100,18 +100,18 @@ const draftPrompt = (extra) =>
   `Author the OpenSpec change artifacts for "${idea}" in ${repo}.\n\n` +
   `Approach (already judged — follow it):\n${judgment.synthesis}\n\n${context}\n\n` +
   `Rules:\n` +
-  `- Follow the repo's OpenSpec conventions EXACTLY (openspec/config.yaml schema; if .claude/skills/openspec-propose/SKILL.md exists, read it and follow its artifact structure).\n` +
+  `- Follow the repo's OpenSpec conventions as written (openspec/config.yaml schema; if .claude/skills/openspec-propose/SKILL.md exists, read it and follow its artifact structure).\n` +
   `- Change ID: ${wantedChangeId || 'derive a kebab-case ID consistent with existing change naming; avoid collisions'}.\n` +
   `- Write proposal.md, design.md, tasks.md (checkboxes grouped into coherent subsections — they become hub tasks later), and spec deltas if the schema calls for them, under openspec/changes/<changeId>/.\n` +
   `- tasks.md must include testing and docs work, not just feature code.\n` +
   `- ${graftHint}Derive each group's "**Files:**" line from real edges (\`graft callers\`/\`graft skeleton\`), not guesses.\n` +
-  `- tasks.md is executed by PARALLEL agent lanes (one git worktree each). Author it for width: every group carries a "**Files:**" line naming the path prefixes it edits; a group's "Depends on:" line lists only TRUE data dependencies (it reads what another group writes) — never "safer after", "same subsystem" or "review together"; keep blocker chains short and give the change several independent starting groups (tests may depend on their subject group, not on unrelated groups). Any box that needs a deploy, a live run, a hands-on check or an owner sign-off goes in its own clearly-labelled owner-run group, never mixed into an agent group.\n` +
+  `- tasks.md is executed by parallel agent lanes (one git worktree each), and a lane sits idle whenever its next group waits on another. Author it for width: every group carries a "**Files:**" line naming the path prefixes it edits; a group's "Depends on:" line lists only data dependencies (it reads what another group writes), so "safer after", "same subsystem" and "review together" are not dependencies; keep blocker chains short and give the change several independent starting groups (tests may depend on their subject group, not on unrelated groups). Any box that needs a deploy, a live run, a hands-on check or an owner sign-off goes in its own clearly-labelled owner-run group, separate from every agent group, because agents may not deploy or touch live state.\n` +
   `- If "npx --yes @fission-ai/openspec@latest validate <changeId>" works in this repo, run it and fix what it reports; record the output.\n` +
   `- Write each artifact with the Write tool once (no bash heredocs); later fixes are Edit calls.\n` +
-  `- Do NOT commit, do NOT touch code outside openspec/changes/<changeId>/.\n` +
+  `- Leave everything uncommitted and edit nothing outside openspec/changes/<changeId>/: a person reviews the artifacts before they are planned.\n` +
   (extra || '') +
   `\nReturn {changeId, files (paths written), summary, validation}.`
-let draft = await agent(draftPrompt(), { model: 'opus', phase: 'Draft', label: 'draft-artifacts', schema: DRAFT_SCHEMA })
+let draft = await agent(draftPrompt(), { model: 'opus', effort: 'high', phase: 'Draft', label: 'draft-artifacts', schema: DRAFT_SCHEMA })
 if (!draft) return { stopped: 'draft-failed' }
 
 // ── Adversarial critique ────────────────────────────────────────────────────
@@ -123,6 +123,8 @@ const CRIT_SCHEMA = {
     minors: { type: 'array', items: { type: 'string' } },
   },
 }
+// One return contract for all three critics: the reviser reads these strings as its work-list.
+const CRIT_FORMAT = `Return {blockers, majors, minors}: one finding per string, each a single sentence with a file reference, stating the defect and not restating the artifact. A blocker makes the change wrong or unimplementable; a major is missing or incorrect work; a minor is everything else. Return empty arrays when the change is clean.`
 async function critique() {
   phase('Critique')
   const dir = `${repo}/openspec/changes/${draft.changeId}`
@@ -130,19 +132,19 @@ async function critique() {
     () => agent(
       `Adversarially critique the change at ${dir} for COMPLETENESS against the intent "${idea}" and this approach:\n${judgment.synthesis}\n` +
       `What outcome, edge case, migration, or rollout step is missing? Missing testing/docs tasks are majors. ` +
-      `Return {blockers, majors, minors} as terse strings with file references — at most 25 words each, at most 12 findings total, no restating the artifact. Empty arrays if genuinely clean.`,
-      { model: 'sonnet', phase: 'Critique', label: 'critic:completeness', schema: CRIT_SCHEMA }),
+      `${CRIT_FORMAT}`,
+      { model: 'sonnet', effort: 'medium', phase: 'Critique', label: 'critic:completeness', schema: CRIT_SCHEMA }),
     () => agent(
       `Adversarially critique the change at ${dir} for FEASIBILITY against the actual codebase in ${repo}. ` +
-      `Verification method (mandatory, do this before any grep or file read): for EVERY file, symbol, API, schema field and utility the artifacts name, run \`graft grep "<literal>"\` (exhaustive, grouped by symbol) or \`graft callers <symbol>\` in ${repo}; use \`graft skeleton <file>\` to check a file's real API and \`graft ask "<claim>" --source\` to test a design claim against the code. Fall back to grep/Read only for unindexed files (docs, config) or if graft errors — and say so. ` +
+      `Verification method: before any grep or file read, for every file, symbol, API, schema field and utility the artifacts name, run \`graft grep "<literal>"\` (exhaustive, grouped by symbol) or \`graft callers <symbol>\` in ${repo}; use \`graft skeleton <file>\` to check a file's real API and \`graft ask "<claim>" --source\` to test a design claim against the code. Use grep/Read for unindexed files (docs, config) or if graft errors, and say that you did. ` +
       `Verify referenced files, APIs, schemas, and utilities exist as described; flag anything the design assumes wrongly, ` +
-      `and any conflict with repo guardrails or the constraints docs. Return {blockers, majors, minors}.`,
-      { model: 'sonnet', phase: 'Critique', label: 'critic:feasibility', schema: CRIT_SCHEMA }),
+      `and any conflict with repo guardrails or the constraints docs. ${CRIT_FORMAT}`,
+      { model: 'sonnet', effort: 'medium', phase: 'Critique', label: 'critic:feasibility', schema: CRIT_SCHEMA }),
     () => agent(
       `Adversarially critique ${dir}/tasks.md for TASK QUALITY: is every subsection independently implementable and reviewable ` +
       `by an agent that sees only that section plus a specRef? Are dependencies between sections explicit? Is any section ` +
-      `too big (>~8 checkboxes) or vague? Return {blockers, majors, minors}.`,
-      { model: 'sonnet', phase: 'Critique', label: 'critic:tasks', schema: CRIT_SCHEMA }),
+      `too big (more than about 8 checkboxes) or vague? ${CRIT_FORMAT}`,
+      { model: 'sonnet', effort: 'medium', phase: 'Critique', label: 'critic:tasks', schema: CRIT_SCHEMA }),
   ])).filter(Boolean)
 }
 
@@ -157,8 +159,8 @@ if (allBlockers.length + allMajors.length > 0) {
   revised = true
   const fixes = [...allBlockers.map(b => `[blocker] ${b}`), ...allMajors.map(m => `[major] ${m}`)].join('\n- ')
   draft = await agent(
-    draftPrompt(`- The artifacts already exist at openspec/changes/${draft.changeId}/ — REVISE them in place with targeted Edit calls (never Write/heredoc a whole file again; measured 2026-09-16: revise passes re-emitted ~20k chars per file) to resolve these critique findings, do not rewrite from scratch:\n- ${fixes}\n`),
-    { model: 'opus', phase: 'Revise', label: 'revise-artifacts', schema: DRAFT_SCHEMA },
+    draftPrompt(`- The artifacts already exist at openspec/changes/${draft.changeId}/ — revise them in place with targeted Edit calls to resolve these critique findings (rewriting a whole file re-emits about 20k characters for a few changed lines):\n- ${fixes}\n`),
+    { model: 'opus', effort: 'high', phase: 'Revise', label: 'revise-artifacts', schema: DRAFT_SCHEMA },
   )
   if (!draft) return { stopped: 'revise-failed' }
   crits = await critique()

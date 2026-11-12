@@ -59,6 +59,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, symlinkSync
 import { dirname, join, resolve } from 'node:path'
 import net from 'node:net'
 import { createRequire } from 'node:module'
+import { pathToFileURL } from 'node:url'
 
 // ── configuration ─────────────────────────────────────────────────────────
 // beatpath's profile is the script's original, hard-coded behaviour: it is
@@ -275,6 +276,20 @@ async function probe(browser, route, device) {
     }
   }, [TAP_MIN, BOUNDARY.source])
   entry.metrics = { ...entry.metrics, ...m }
+
+  // Blank ground under the repo's ONE rule (home-next-cycle-1-2026-10 g11f, 2026-10-27):
+  // when the repo vendors tools/capture/lib/blankGround.mjs and the page has bento
+  // cells, record the per-cell table beside the screenshots. The bar is judged by
+  // the row's gate, not here: a missed bar is reported, never moved.
+  try {
+    const bgLib = join(REPO, 'tools/capture/lib/blankGround.mjs')
+    if (existsSync(bgLib) && (await page.locator('.bp-bento-block').count()) > 0) {
+      const { measureBlankGround } = await import(pathToFileURL(bgLib).href)
+      entry.metrics.blankGround = await measureBlankGround(page)
+    }
+  } catch (e) {
+    entry.problems.push(`blank ground not measured: ${String(e).slice(0, 120)} (reported, not fatal)`)
+  }
 
   if (CFG.failOnHttpStatus != null && (entry.metrics.status ?? 0) >= CFG.failOnHttpStatus) { entry.problems.push(`HTTP ${entry.metrics.status}`); entry.ok = false }
   if (m.scrollWidth > m.innerWidth) { entry.problems.push(`horizontal overflow: scrollWidth ${m.scrollWidth} > ${m.innerWidth}`); entry.ok = false }

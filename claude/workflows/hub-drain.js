@@ -28,8 +28,8 @@ const repo = A.repo || `/home/mdv/code/${project}`
 const change = A.change
 const maxTasks = A.maxTasks || 1000
 const LANES = Math.max(1, Math.min(6, A.lanes || 3))
-const OFFSET = Math.max(0, A.laneOffset || 0)
-const ONLY = Array.isArray(A.only) ? new Set(A.only) : null // optional: pin the run to these task ids // lane numbers start at OFFSET+1 so two drains can run side by side
+const OFFSET = Math.max(0, A.laneOffset || 0) // lane numbers start at OFFSET+1 so two drains can run side by side
+const ONLY = Array.isArray(A.only) ? new Set(A.only) : null // optional: pin the run to these task ids
 
 const HUB = 'http://127.0.0.1:8050'
 const SCRIPTS = '/home/mdv/.claude/workflows'
@@ -224,7 +224,7 @@ async function runTask(task, n, wt) {
 
   let currentTier = tier
   let worker = await agent(
-    `Run task ${task.id} ("${task.title}") in project repo ${wt} — this is a git worktree on branch ${lane}; treat it exactly as the project repo. Follow your full protocol.`,
+    `Run task ${task.id} ("${task.title}") in project repo ${wt}. This is a git worktree on branch ${lane}, and your lane number is ${n}; treat the worktree as the project repo.`,
     { agentType: TIER_AGENT[currentTier], phase: 'Implement', label: `${lane}:${task.id}`, schema: WORKER_SCHEMA },
   )
   if (!worker) { log(`✗ worker died on ${task.id}`); return }
@@ -259,7 +259,7 @@ async function runTask(task, n, wt) {
     let v = null
     if (worker.commitRange) {
       v = await agent(
-        `Review task ${task.id} in ${wt}, commit range: ${worker.commitRange}. Follow your protocol. ` +
+        `Review task ${task.id} in ${wt}, commit range: ${worker.commitRange}. ` +
         `Scope note: the worker stopped on the Blocked path (${(worker.blockReason || '').slice(0, 300)}); ` +
         `review only the code it committed and do not fail the review for the owner-gated boxes being unticked.`,
         { agentType: 'hub-reviewer', phase: 'Review', label: `review-blocked:${task.id}`, schema: VERDICT_SCHEMA },
@@ -281,11 +281,11 @@ async function runTask(task, n, wt) {
       // into its own blocked child so code dependents stop waiting on a human step.
       const child = `${task.id}-owner-run`
       await agent(
-        `Job D: split an owner-run remainder off task ${task.id}. Using mcp__task-hub__sync_task, create task id "${child}" ` +
+        `Job D: split an owner-run remainder off task ${task.id}. Sync one new task: create task id "${child}" ` +
         `(project "${project}", status "blocked") with title "OWNER OPS: finish the owner-executed boxes of ${task.id} — commands and context in notes; code half landed on main (${landed})" ` +
-        `and metadata {change, specRef, priority, boxes copied from ${task.id}; type "chore"; tier "haiku"; blockedBy ["${task.id}"]; touches []; ` +
+        `and metadata {change, specRef, priority, boxes copied from ${task.id} (fetch it to read them); type "chore"; tier "haiku"; blockedBy ["${task.id}"]; touches []; ` +
         `notes: ${JSON.stringify((worker.blockReason || worker.summary || '').slice(0, 1600))}}. ` +
-        `Then mcp__task-hub__update_task_status(${task.id}, "completed", notes="Code half reviewed (${v.verdict}) and landed ${landed}; owner-executed remainder split into ${child}."). ` +
+        `Follow-up step: mcp__task-hub__update_task_status(${task.id}, "completed", notes="Code half reviewed (${v.verdict}) and landed ${landed}; owner-executed remainder split into ${child}."). ` +
         `Return {ok, child}.`,
         { agentType: 'hub-steward', phase: 'Land', label: `split:${task.id}` },
       )
@@ -300,7 +300,7 @@ async function runTask(task, n, wt) {
   let cycles = 0
   for (;;) {
     verdict = await agent(
-      `Review task ${task.id} in ${wt}, commit range: ${worker.commitRange}. Follow your protocol.`,
+      `Review task ${task.id} in ${wt}, commit range: ${worker.commitRange}.`,
       { agentType: 'hub-reviewer', phase: 'Review', label: `review:${task.id}`, schema: VERDICT_SCHEMA },
     )
     if (!verdict) { log(`✗ reviewer died on ${task.id}`); return }
@@ -320,7 +320,7 @@ async function runTask(task, n, wt) {
     log(`↻ ${lane} fix cycle ${cycles} for ${task.id} (${currentTier})`)
     worker = await agent(
       `Fix-cycle for task ${task.id} in ${wt} (git worktree on branch ${lane}). Existing work is in commit range ${worker.commitRange}. ` +
-      `Do NOT re-implement — address these review findings with follow-up commits:\n` +
+      `Keep the existing commits and address these review findings with follow-up commits:\n` +
       verdict.findings.filter(f => f.severity !== 'minor')
         .map(f => `- ${f.file} [${f.severity}]: ${f.issue} → ${f.requiredFix}`).join('\n'),
       { agentType: TIER_AGENT[currentTier], phase: 'Implement', label: `fix${cycles}:${task.id}`, schema: WORKER_SCHEMA },
